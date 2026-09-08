@@ -91,11 +91,7 @@ describe("GiracleClient", () => {
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    await client.sendMessage({
-      channelId: "c1",
-      message: "hi",
-      replyingMessageId: "m9",
-    });
+    await client.sendMessage("c1", "hi", "m9");
 
     expect(calls).toHaveLength(1);
     const body = JSON.parse(String(calls[0]?.init?.body));
@@ -114,7 +110,7 @@ describe("GiracleClient", () => {
     const { impl, calls } = mockFetch(() => okJson(makeMessage()));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    await client.sendMessage({ channelId: "c1", message: "hi" });
+    await client.sendMessage("c1", "hi");
 
     const body = JSON.parse(String(calls[0]?.init?.body)) as Record<
       string,

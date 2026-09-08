@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "description": "Giracle Bot framework for Bun (HTTP /ext + /ws)",
   "type": "module",
-  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {

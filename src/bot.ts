@@ -91,11 +91,11 @@ export class GiracleBot extends EventEmitter {
     message: string,
     replyingMessageId?: string,
   ): Promise<Message> {
-    const res = await this.client.sendMessage({
+    const res = await this.client.sendMessage(
       channelId,
       message,
       replyingMessageId,
-    });
+    );
 
     this.cachedUserId ??= res.userId;
 
@@ -104,7 +104,7 @@ export class GiracleBot extends EventEmitter {
 
   /** POST /ext/message/edit */
   editMessage(targetMessageId: string, message: string): Promise<EditResult> {
-    return this.client.editMessage({ targetMessageId, message });
+    return this.client.editMessage(targetMessageId, message);
   }
 
   private wsUrl(): string {

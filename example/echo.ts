@@ -18,4 +18,4 @@ bot.on("error", (err) => {
   console.error("bot error:", err);
 });
 
-await bot.start();
+bot.start();

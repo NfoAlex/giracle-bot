@@ -38,18 +38,6 @@ export type SignalEnvelope = {
  data: unknown;
 };
 
-/** 送信オプション */
-export type SendMessageInput = {
- channelId: string;
- message: string;
- replyingMessageId?: string;
-};
-
-export type EditMessageInput = {
- targetMessageId: string;
- message: string;
-};
-
 export type BotOptions = {
  serverUrl: string; // 例: "http://localhost:3000"（末尾スラッシュ無し想定、正規化する）
  /** BotManage.tokenCode（UUID）。scheme なしでそのまま Authorization ヘッダに載せる */

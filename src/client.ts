@@ -1,10 +1,5 @@
 import { GiracleApiError } from "./errors";
-import type {
-  EditMessageInput,
-  EditResult,
-  Message,
-  SendMessageInput,
-} from "./types";
+import type { EditResult, Message } from "./types";
 
 /** POST で JSON を送るための共通ヘッダ */
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -36,23 +31,30 @@ export class GiracleClient {
     return (await this.handle(res)) as Message;
   }
 
-  /** POST /ext/message/send */
-  async sendMessage(input: SendMessageInput): Promise<Message> {
+  /** POST /ext/message/send。ボディ: { channelId, message, replyingMessageId? }（undefined は JSON 化で消える） */
+  async sendMessage(
+    channelId: string,
+    message: string,
+    replyingMessageId?: string,
+  ): Promise<Message> {
     const res = await this.fetchImpl(`${this.baseUrl}/ext/message/send`, {
       method: "POST",
       headers: { ...this.authHeaders(), ...JSON_HEADERS },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ channelId, message, replyingMessageId }),
     });
 
     return (await this.handle(res)) as Message;
   }
 
-  /** POST /ext/message/edit */
-  async editMessage(input: EditMessageInput): Promise<EditResult> {
+  /** POST /ext/message/edit。ボディ: { targetMessageId, message } */
+  async editMessage(
+    targetMessageId: string,
+    message: string,
+  ): Promise<EditResult> {
     const res = await this.fetchImpl(`${this.baseUrl}/ext/message/edit`, {
       method: "POST",
       headers: { ...this.authHeaders(), ...JSON_HEADERS },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ targetMessageId, message }),
     });
 
     return (await this.handle(res)) as EditResult;
