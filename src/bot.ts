@@ -4,6 +4,7 @@ import { GiracleSocket, type SocketCtor } from "./ws";
 import type {
   BotEventMap,
   BotOptions,
+  DeleteResult,
   EditResult,
   InboxAdded,
   Message,
@@ -105,6 +106,11 @@ export class GiracleBot extends EventEmitter {
   /** POST /ext/message/edit */
   editMessage(targetMessageId: string, message: string): Promise<EditResult> {
     return this.client.editMessage(targetMessageId, message);
+  }
+
+  /** DELETE /ext/message/delete。自分の送信メッセージのみ削除可 */
+  deleteMessage(targetMessageId: string): Promise<DeleteResult> {
+    return this.client.deleteMessage(targetMessageId);
   }
 
   private wsUrl(): string {

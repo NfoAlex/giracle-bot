@@ -26,6 +26,13 @@ export type EditResult = {
  userId: string;
 };
 
+/** DELETE /ext/message/delete のレスポンス（削除前の部分行） */
+export type DeleteResult = {
+  id: string;
+  userId: string;
+  channelId: string;
+};
+
 /** inbox::Added signal の data */
 export type InboxAdded = {
  message: Message;

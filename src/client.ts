@@ -1,5 +1,5 @@
 import { GiracleApiError } from "./errors";
-import type { EditResult, Message } from "./types";
+import type { DeleteResult, EditResult, Message } from "./types";
 
 /** POST で JSON を送るための共通ヘッダ */
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -58,6 +58,17 @@ export class GiracleClient {
     });
 
     return (await this.handle(res)) as EditResult;
+  }
+
+  /** DELETE /ext/message/delete。ボディ: { targetMessageId }。自分の送信メッセージのみ削除可 */
+  async deleteMessage(targetMessageId: string): Promise<DeleteResult> {
+    const res = await this.fetchImpl(`${this.baseUrl}/ext/message/delete`, {
+      method: "DELETE",
+      headers: { ...this.authHeaders(), ...JSON_HEADERS },
+      body: JSON.stringify({ targetMessageId }),
+    });
+
+    return (await this.handle(res)) as DeleteResult;
   }
 
   /** 生の JSON を返す（ラッパー無し）。エラー時はテキストボディを GiracleApiError に載せる */
