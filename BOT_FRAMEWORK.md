@@ -32,11 +32,13 @@ Bot開発者                 Giracleサーバー
 | GET | `/ext/message/:messageId` | `canReadMessage` | メッセージ行（`MessageUrlPreview` / `MessageFileAttached` 配列込み） |
 | POST | `/ext/message/send` | `canSendMessage` | メッセージ行（同上） |
 | POST | `/ext/message/edit` | `canSendMessage` | `{ id, channelId, content, isEdited, userId }`（部分行） |
+| DELETE | `/ext/message/delete` | `canSendMessage` | `{ id, userId, channelId }`（削除前の部分行） |
 
 リクエストボディ:
 
 - `send`: `{ channelId: string, message: string, replyingMessageId?: string }`
 - `edit`: `{ targetMessageId: string, message: string }`
+- `delete`: `{ targetMessageId: string }`
 
 エラー（status code と文言はサーバー側 `response` スキーマと一致するので、フレームワーク側で文言に依存した分岐を書かないこと。code だけで判定する）:
 
@@ -49,7 +51,7 @@ Bot開発者                 Giracleサーバー
 | 401 | `Authorization header is invalid` / `Your bot is not approved` | トークン不正 / 未承認 |
 | 403 | `Permission not enough` | `can*` フラグ不足 |
 | 403 | `Channel not permitted` | `botChannelPermissions` に該当チャンネルが無い |
-| 403 | `You are not sender of this message` | 他人のメッセージを編集 |
+| 403 | `You are not sender of this message` | 他人のメッセージを編集・削除 |
 | 404 | `Message not found` | 存在しない or 許可チャンネル外 |
 
 補足:
@@ -57,6 +59,7 @@ Bot開発者                 Giracleサーバー
 - **レスポンス形式が通常モジュールと異なる。** `/ext` は `{ message, data }` ラッパー無しで生のメッセージ行を返す。エラー時はボディがテキスト（JSON ではない）。
 - メンションは `@<userId>` 形式。Bot 送信でもチャンネル参加者にメンション通知される（サービス側で処理済みのため、フレームワーク側で通知処理は不要）。
 - URL プレビューは `send` / `edit` の afterResponse で非同期生成され、`message::UpdateMessage` が配信される。直後の GET にはまだ反映されていないことがある。
+- `delete` は自分（`remoteUserId`）が送信したメッセージのみ削除可。関連データ（URL プレビュー・リアクション・添付ファイル・inbox）を1トランザクションで削除し、ファイル実体も消す。WS へは GLOBAL に `message::MessageDeleted`（data: `{ messageId, channelId }`）が publish されるが、**Bot は GLOBAL を購読しないためこの signal は届かない**。
 
 ### 1.3 WebSocket
 
@@ -105,10 +108,11 @@ bot.start();
 
 ### 2.2 機能要件
 
-1. **API クライアント** — `/ext` の 3 エンドポイントを型付きメソッドでラップ。
+1. **API クライアント** — `/ext` の 4 エンドポイントを型付きメソッドでラップ。
    - `getMessage(messageId): Promise<Message>`
    - `sendMessage(channelId, message, replyTo?): Promise<Message>`
    - `editMessage(messageId, message): Promise<EditResult>`
+   - `deleteMessage(messageId): Promise<DeleteResult>`（`DeleteResult = { id, userId, channelId }`）
    - エラーはカスタムエラー `GiracleApiError`（`status`, `body` を保持）で送出し、文言は保持するだけで分岐に使わない。
 2. **WS クライアント** — 自動再接続（指数バックオフ、上限あり）、受信 signal の `signal`/`data` 正規化、`ping` 定期送信（30 秒間隔。サーバーが inactive 切断をするかは未確認のため、実測して調整）。
 3. **イベント** — `message` / `messageUpdate` / `inbox` / `error` / `close` の最低 5 種。Node 標準 `EventEmitter` か自前の薄い `Map<string, Set<fn>>` で良い。
