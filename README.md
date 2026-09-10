@@ -37,6 +37,16 @@ bot.start();
 
 実行: `bun run example/echo.ts`
 
+## Bot を作る（コーディングエージェント向け）
+
+`SKILL.md` はこのフレームワークで Bot を実装するためのエージェント向け手順書。新しい Bot の作成・コマンド/返信/編集監視/削除の実装・イベントハンドラ追加を依頼する際は、これを読ませると API 表面・落とし穴（自己送信ガード、`messageUpdate` と編集の混同、`err.status` 分岐など）・モックでの検証手順がそのまま使える。
+
+```text
+SKILL.md を読んで、<やりたいこと> をする Bot を example/ に作って
+```
+
+Claude Code / 同種のエージェントでは `SKILL.md` をスキルとして参照させても良い（`name: giracle-bot`）。動く雛形は `example/`（`echo` / `reply-bot` / `edit-watcher` / `delete-bot`）にある。
+
 ## API
 
 | メソッド | 説明 |
