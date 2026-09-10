@@ -120,4 +120,49 @@ describe("GiracleClient", () => {
     expect(body).toEqual({ channelId: "c1", message: "hi" });
     expect("replyingMessageId" in body).toBe(false);
   });
+
+  test("200 だが本文が JSON でない → GiracleApiError(status=200, body 保持)", async () => {
+    const { impl } = mockFetch(() => textRes(200, "<html>oops</html>"));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.getMessage("m1").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    const apiErr = err as GiracleApiError;
+    expect(apiErr.status).toBe(200);
+    expect(apiErr.body).toBe("<html>oops</html>");
+  });
+
+  test("204 空ボディ → GiracleApiError(status=204, body=\"\")", async () => {
+    const { impl } = mockFetch(() => textRes(204, ""));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.getMessage("m1").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    const apiErr = err as GiracleApiError;
+    expect(apiErr.status).toBe(204);
+    expect(apiErr.body).toBe("");
+  });
+
+  test("送信系でも 2xx 非 JSON は同じフォールバックに乗る", async () => {
+    const { impl } = mockFetch(() => textRes(200, "OK"));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.deleteMessage("m1").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    const apiErr = err as GiracleApiError;
+    expect(apiErr.status).toBe(200);
+    expect(apiErr.body).toBe("OK");
+  });
 });

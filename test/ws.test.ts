@@ -123,7 +123,35 @@ describe("GiracleSocket ERROR / 再接続", () => {
     expect(MockWebSocket.instances).toHaveLength(2);
     const ws1 = latestMock();
     ws1.open(); // attempt → 0
-    expect((ws1 as unknown as { readyState: number }).readyState).toBe(WS_OPEN);
+    expect(ws1.readyState).toBe(WS_OPEN);
+  });
+
+  test("コンストラクタ throw は未捕捉にならず、再試行が予約される", async () => {
+    let calls = 0;
+
+    class FlakySocket extends MockWebSocket {
+      constructor(url: string, options?: { headers?: Record<string, string> }) {
+        calls += 1;
+        if (calls === 1) throw new Error("ctor failure");
+
+        super(url, options);
+      }
+    }
+
+    const s = new GiracleSocket(URL, TOKEN, {
+      WebSocketImpl: FlakySocket as never,
+      reconnectBaseMs: 10,
+      reconnectMaxMs: 60_000,
+    });
+    sockets.push(s);
+
+    s.start();
+    expect(MockWebSocket.instances).toHaveLength(0); // 1 回目は throw
+
+    await sleep(40);
+
+    expect(calls).toBe(2);
+    expect(MockWebSocket.instances).toHaveLength(1); // 再試行で接続できた
   });
 });
 
@@ -135,13 +163,52 @@ describe("GiracleSocket ping", () => {
     ws.open();
 
     expect(ws.sent).toEqual([]);
-    await sleep(45);
+
+    // liveness 監視で close されないよう pong を返しつつ、ping が間隔送信されることを見る
+    for (let i = 0; i < 3; i++) {
+      await sleep(20);
+      ws.receive(JSON.stringify({ signal: "pong", data: "pong" }));
+    }
 
     const pings = ws.sent.filter(
       (m) => m === JSON.stringify({ signal: "ping", data: "pong" }),
     );
 
     expect(pings.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("pong 無応答 → 半死接続とみなし close して再接続する", async () => {
+    const s = makeSocket({
+      pingIntervalMs: 15,
+      reconnectBaseMs: 10,
+      reconnectMaxMs: 60_000,
+    });
+    s.start();
+    const ws = latestMock();
+    ws.open();
+
+    await sleep(60);
+
+    expect(ws.closed).toBe(true);
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  test("pong 応答あり → close せず、pong は onSignal に流れない", async () => {
+    const s = makeSocket({ pingIntervalMs: 15 });
+    const got: SignalEnvelope[] = [];
+    s.onSignal = (env) => got.push(env);
+    s.start();
+    const ws = latestMock();
+    ws.open();
+
+    for (let i = 0; i < 6; i++) {
+      await sleep(10);
+      ws.receive(JSON.stringify({ signal: "pong", data: "pong" }));
+    }
+
+    expect(ws.closed).toBe(false);
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(got).toEqual([]);
   });
 });
 

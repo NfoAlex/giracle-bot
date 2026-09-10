@@ -1,5 +1,5 @@
 import type { Message } from "../src/types";
-import type { SocketLike } from "../src/ws";
+import type { CloseInfo, SocketLike } from "../src/ws";
 
 /** 実サーバー・ネットワークを使わず WS を差し替える Mock。 */
 export class MockWebSocket implements SocketLike {
@@ -9,7 +9,7 @@ export class MockWebSocket implements SocketLike {
   readyState = 0;
   onopen: (() => void) | null = null;
   onmessage: ((ev: { data: unknown }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((ev?: CloseInfo) => void) | null = null;
   url: string;
   options: { headers?: Record<string, string> } | undefined;
   sent: string[] = [];
@@ -28,7 +28,7 @@ export class MockWebSocket implements SocketLike {
   close(): void {
     this.closed = true;
     this.readyState = 3;
-    this.onclose?.();
+    this.onclose?.({ code: 1000, reason: "client close" });
   }
 
   /** サーバー側が OPEN を送ってきた想定（ping 開始を trigger） */
@@ -43,9 +43,9 @@ export class MockWebSocket implements SocketLike {
   }
 
   /** サーバー側から close（異常/正常どちらでも使える） */
-  serverClose(): void {
+  serverClose(code = 1006, reason = "abnormal closure"): void {
     this.readyState = 3;
-    this.onclose?.();
+    this.onclose?.({ code, reason });
   }
 }
 

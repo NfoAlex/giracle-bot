@@ -71,15 +71,22 @@ export class GiracleClient {
     return (await this.handle(res)) as DeleteResult;
   }
 
-  /** 生の JSON を返す（ラッパー無し）。エラー時はテキストボディを GiracleApiError に載せる */
+  /**
+   * 生の JSON を返す（ラッパー無し）。
+   * 非 2xx、および 2xx でも本文が JSON でない場合はテキストボディを GiracleApiError に載せる。
+   */
   private async handle(res: Response): Promise<unknown> {
-    if (!res.ok) {
-      const body = await res.text();
+    const text = await res.text();
 
-      throw new GiracleApiError(res.status, body);
+    if (!res.ok) {
+      throw new GiracleApiError(res.status, text);
     }
 
-    return res.json();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new GiracleApiError(res.status, text);
+    }
   }
 
   private authHeaders(): Record<string, string> {

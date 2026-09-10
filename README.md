@@ -54,10 +54,28 @@ bot.start();
 | `message` | `Message` | 新規メッセージ（自己送信は `remoteUserId` 確定後にフィルタ） |
 | `messageUpdate` | `Message` 差分 | 編集 / URL プレビュー生成後の更新。`isEdited` で判別 |
 | `inbox` | `InboxAdded` | inbox::Added |
-| `error` | `Error` | HTTP/WS エラー。`ERROR` signal（トークン無効・未承認）受信時は**再接続しない** |
+| `error` | `Error` | HTTP/WS エラー。`ERROR` signal（トークン無効・未承認）受信時は**再接続しない**。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
 | `close` | なし | `stop()` または fatal エラーによる終了 |
 
-WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。ping は 30 秒間隔で自動送信。
+WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。ping は 30 秒間隔で自動送信し、`pong` が 2 周期（`pingIntervalMs × 2`）返らなければ半死接続とみなして切断 → 再接続する。
+
+## ログ
+
+接続状態の変化は `[giracle-bot]` 接頭辞で標準出力に出力する（出力先は `src/log.ts` の 1 箇所）。
+
+```text
+[giracle-bot] bot を起動
+[giracle-bot] 接続開始: ws://localhost:3000/ws
+[giracle-bot] 接続確立
+[giracle-bot] 切断を検知 (code 1006 abnormal closure)
+[giracle-bot] 再接続を予約: 1000ms 後 (attempt 1)
+[giracle-bot] 再接続を試行 (attempt 1): ws://localhost:3000/ws
+[giracle-bot] 再接続に成功 (attempt 1)
+[giracle-bot] pong 無応答 (最終受信から 61000ms) → 切断して再接続
+[giracle-bot] ERROR signal を受信: Your bot is not approved → 再接続しない
+[giracle-bot] bot を停止
+[giracle-bot] 切断を検知 (停止済みのため再接続しない)
+```
 
 ## 配布（バンドル）
 

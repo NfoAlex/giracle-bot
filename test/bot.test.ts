@@ -173,4 +173,89 @@ describe("GiracleBot", () => {
 
     expect(closed).toBe(1);
   });
+
+  test("start() を 2 回呼んでもソケットは 1 個だけ", () => {
+    const b = newBot({ botUserId: "me" });
+    bot = b;
+    b.start();
+    b.start();
+
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  test("ERROR signal 後の stop() で close は合計 1 回", () => {
+    const b = newBot({ botUserId: "me" });
+    bot = b;
+    let closed = 0;
+    b.on("error", () => {});
+    b.on("close", () => (closed += 1));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({ signal: "ERROR", data: "unauthorized" }),
+    );
+    expect(closed).toBe(1);
+
+    b.stop();
+    expect(closed).toBe(1);
+  });
+
+  test("ERROR signal 時、error リスナー未登録でも throw せず console.error にフォールバック", () => {
+    const b = newBot({ botUserId: "me" });
+    bot = b;
+    const original = console.error;
+    const logged: unknown[][] = [];
+    console.error = (...args: unknown[]) => {
+      logged.push(args);
+    };
+
+    try {
+      b.start();
+
+      expect(() =>
+        latestMock().receive(
+          JSON.stringify({ signal: "ERROR", data: "unauthorized" }),
+        ),
+      ).not.toThrow();
+    } finally {
+      console.error = original;
+    }
+
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0]?.[0])).toContain("giracle-bot: unhandled error:");
+  });
+
+  test("id 無しの message::UpdateMessage は messageUpdate を発火しない", () => {
+    const b = newBot({ botUserId: "me" });
+    bot = b;
+    const updates: unknown[] = [];
+    b.on("messageUpdate", (u) => updates.push(u));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({
+        signal: "message::UpdateMessage",
+        data: { content: "x" },
+      }),
+    );
+
+    expect(updates).toHaveLength(0);
+  });
+
+  test("userId 無しの message::SendMessage は message を発火しない", () => {
+    const b = newBot({ botUserId: "me" });
+    bot = b;
+    const messages: unknown[] = [];
+    b.on("message", (m) => messages.push(m));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({
+        signal: "message::SendMessage",
+        data: { id: "m", content: "x" },
+      }),
+    );
+
+    expect(messages).toHaveLength(0);
+  });
 });
