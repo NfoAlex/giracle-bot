@@ -18,4 +18,5 @@ bot.on("error", (err) => {
   console.error("bot error:", err);
 });
 
+console.log("started");
 bot.start();
