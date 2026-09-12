@@ -4,7 +4,7 @@ Giracle サーバー向け Bot フレームワーク（Bun ランタイム用、
 
 ```text
 Bot (Bun) ──HTTP──→ /ext/message/...   Authorization: <tokenCode>
-          ←─WS──── /ws                 signal: message::SendMessage 等
+          ←─WS──── /ext/ws             signal: message::SendMessage 等
 ```
 
 ## セットアップ
@@ -75,11 +75,11 @@ WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で�
 
 ```text
 [giracle-bot] bot を起動
-[giracle-bot] 接続開始: ws://localhost:3000/ws
+[giracle-bot] 接続開始: ws://localhost:3000/ext/ws
 [giracle-bot] 接続確立
 [giracle-bot] 切断を検知 (code 1006 abnormal closure)
 [giracle-bot] 再接続を予約: 1000ms 後 (attempt 1)
-[giracle-bot] 再接続を試行 (attempt 1): ws://localhost:3000/ws
+[giracle-bot] 再接続を試行 (attempt 1): ws://localhost:3000/ext/ws
 [giracle-bot] 再接続に成功 (attempt 1)
 [giracle-bot] pong 無応答 (最終受信から 61000ms) → 切断して再接続
 [giracle-bot] ERROR signal を受信: Your bot is not approved → 再接続しない

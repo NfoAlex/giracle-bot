@@ -46,7 +46,7 @@ const DEFAULT_MAX = 60_000;
 const DEFAULT_PING = 30_000;
 
 /**
- * /ws のクライアント。受信 signal の正規化・自動再接続・定期 ping を担う。
+ * /ext/ws のクライアント。受信 signal の正規化・自動再接続・定期 ping を担う。
  * 自身はイベントを保持せず、onSignal / onError で外へ知らせる。
  */
 export class GiracleSocket {

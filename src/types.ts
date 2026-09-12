@@ -1,5 +1,5 @@
 /**
- * /ext API と /ws signal の型。BOT_FRAMEWORK.md 2.3 に基づく。
+ * /ext API と /ext/ws signal の型。BOT_FRAMEWORK.md 2.3 に基づく。
  * 実サーバーのレスポンスに合わせる（過剰な型にしない）。
  */
 

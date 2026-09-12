@@ -1,7 +1,7 @@
 {
   "name": "giracle-bot",
   "version": "0.1.0",
-  "description": "Giracle Bot framework for Bun (HTTP /ext + /ws)",
+  "description": "Giracle Bot framework for Bun (HTTP /ext + WS /ext/ws)",
   "type": "module",
   "types": "./dist/index.d.ts",
   "exports": {

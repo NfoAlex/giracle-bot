@@ -152,7 +152,7 @@ export class GiracleBot extends EventEmitter {
   }
 
   private wsUrl(): string {
-    return `${this.options.serverUrl.replace(/\/+$/, "").replace(/^http/, "ws")}/ws`;
+    return `${this.options.serverUrl.replace(/\/+$/, "").replace(/^http/, "ws")}/ext/ws`;
   }
 
   private handleSignal(env: { signal: string; data: unknown }): void {

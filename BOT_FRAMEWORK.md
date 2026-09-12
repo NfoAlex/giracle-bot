@@ -1,6 +1,6 @@
 # Giracle Bot フレームワーク指示書
 
-`/ext` エンドポイントと `/ws` を使った Bot を、Bun ランタイムで簡単に作るための簡易フレームワークの設計・実装指示書。
+`/ext` エンドポイントと `/ext/ws` を使った Bot を、Bun ランタイムで簡単に作るための簡易フレームワークの設計・実装指示書。
 対象読者: フレームワークを実装する開発者。読者が Bot ユーザーを書く側ではない（Bot ユーザー向けの使い方は別途 README に抜き出す）。
 
 前提知識: 本体は `src/external/` に外部 API（prefix `/ext`）を持つ。Bot は `BotManage` 行に紐付く `remoteUserId` のユーザーアカウント名義で動作する。
@@ -10,7 +10,7 @@ Bot開発者                 Giracleサーバー
 ┌──────────┐   HTTP     ┌──────────────────────┐
 │ Botプログラム │ ────────→ │ /ext/message/...      │  Authorization: <tokenCode>
 │ (Bun)     │            │                      │
-│           │   WS       │ /ws                  │  購読: channel::<id>, user::<remoteUserId>
+│           │   WS       │ /ext/ws              │  購読: channel::<id>, user::<remoteUserId>
 └──────────┘ ←────────  └──────────────────────┘
              signal受信: message::SendMessage 等
 ```
@@ -63,7 +63,7 @@ Bot開発者                 Giracleサーバー
 
 ### 1.3 WebSocket
 
-- エンドポイント: `ws://<host>/ws`、ヘッダ `Authorization: <tokenCode>`。
+- エンドポイント: `ws://<host>/ext/ws`、ヘッダ `Authorization: <tokenCode>`（通常ユーザーは `/ws`）。
 - 接続時、サーバーが `user::<remoteUserId>` と許可された全 `channel::<channelId>` を自動購読する。**Bot は `GLOBAL` を購読しない**（`user::Connected` / `user::Disconnected` は受け取れない）。
 - トークン不正・未承認時: `{ signal: "ERROR", data: "..." }` 受信後にサーバーから close される。
 - クライアント → サーバー: `{ signal: "ping", data: "pong" }` で `pong` が返る（これ以外の signal は無視される）。ヘッダ `Authorization` を付ける。
