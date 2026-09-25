@@ -5,7 +5,7 @@ description: Giracle Bot フレームワーク（Bun / src/index.ts の GiracleB
 
 # Giracle Bot を作る
 
-Bun 専用・依存ゼロのクライアントライブラリ。Bot は `/ext`（HTTP）で投稿・編集・削除し、`/ext/ws` で `message::SendMessage` 等を受信する。**登録・承認・チャンネル許可の API は存在しない**（管理者が `BotManage` 行と `botChannelPermissions` を直接作る）。フレームワークがやるのは token 認証・受信 signal の正規化・自己送信フィルタ・自動再接続まで。
+Bun 専用・依存ゼロのクライアントライブラリ。Bot は `/ext`（HTTP）で投稿・編集・削除し、`/ext/ws` で `message::SendMessage` 等を受信する。**登録・承認・チャンネル許可はサーバー側の管理 API（`/server/bot` 系、要 manageServer）か直接 DB で行う**（フレームワークは登録フローを持たない）。フレームワークがやるのは token 認証・受信 signal の正規化・自己送信フィルタ・自動再接続まで。
 
 ## 0. 作業前に必ず読む
 

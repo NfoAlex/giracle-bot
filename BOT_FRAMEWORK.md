@@ -84,8 +84,8 @@ Bot開発者                 Giracleサーバー
 
 ### 1.4 Bot の登録・権限（フレームワークのスコープ外だがREADMEに書く内容）
 
-- Bot の作成エンドポイントは現状存在しない。`BotManage` 行はサーバー管理者が seeds / 直接 DB 挿入で作り、`/server/bot/approval`（要 `manageServer`）で `APPROVED` にする。tokenCode は作成時に自動採番（UUID）。
-- チャンネルごとの許可も `botChannelPermissions` テーブルで手動管理。
+- 登録・承認・チャンネル許可はサーバー側の管理 API（`/server/bot` 系、要 `manageServer`）で行える（作成・更新・削除・`/server/bot/approval` による `APPROVED` 化）。tokenCode は作成時に自動採番（UUID）。
+- チャンネルごとの許可も同じ管理 API で `botChannelPermissions` に設定される。
 - フレームワークは「tokenCode をもらっている」状態を前提とし、登録フローの実装は含めない。
 
 ---
@@ -184,7 +184,7 @@ giracle-bot/
 
 ### 2.7 スコープ外（作らないもの）
 
-- Bot 登録・承認・チャンネル許可の管理 UI/API 呼び出し（現状サーバー側に作成エンドポイントが無いため）
+- Bot 登録・承認・チャンネル許可の管理 UI/API 呼び出し（サーバー側 `/server/bot` 系は管理者向けのため）
 - リアルタイム購読のフィルタリング（channelId 指定 etc.）— 利用者がハンドラ内で判定すれば十分
 - Web Push / Inbox 処理 — サーバー側で済んでいる
 
