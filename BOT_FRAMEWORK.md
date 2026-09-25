@@ -48,11 +48,12 @@ Bot開発者                 Giracleサーバー
 | 400 | `Message is too long. Maximum length is <N>` | `ServerConfig.MessageMaxLength` 超過 |
 | 400 | `Replying message not found` | 返信先が同チャンネルに存在しない |
 | 400 | `Message is already same` | 編集内容が同一 |
-| 401 | `Authorization header is invalid` / `Your bot is not approved` | トークン不正 / 未承認 |
+| 401 | `Authorization header is invalid` / `Your bot is not approved` / `This bot is disabled` | トークン不正 / 未承認 / Bot のユーザーが BAN・論理削除 |
 | 403 | `Permission not enough` | `can*` フラグ不足 |
-| 403 | `Channel not permitted` | `botChannelPermissions` に該当チャンネルが無い |
+| 403 | `Channel not permitted` | `botChannelPermissions` に該当チャンネルが無い（非透過Bot は存在しないチャンネルもこれ） |
 | 403 | `You are not sender of this message` | 他人のメッセージを編集・削除 |
 | 404 | `Message not found` | 存在しない or 許可チャンネル外 |
+| 404 | `Channel not found` | 存在しないチャンネルへの送信（全透過Bot のみ。FK 違反で 500 にしないための確認） |
 
 補足:
 
@@ -65,7 +66,7 @@ Bot開発者                 Giracleサーバー
 
 - エンドポイント: `ws://<host>/ext/ws`、ヘッダ `Authorization: <tokenCode>`（通常ユーザーは `/ws`）。
 - 接続時、サーバーが `user::<remoteUserId>` と許可された全 `channel::<channelId>` を自動購読する。**Bot は `GLOBAL` を購読しない**（`user::Connected` / `user::Disconnected` は受け取れない）。
-- トークン不正・未承認時: `{ signal: "ERROR", data: "..." }` 受信後にサーバーから close される。
+- トークン不正・未承認時: `{ signal: "ERROR", data: "..." }` 受信後にサーバーから close される。文言は `Bot token not valid` / `Your bot is not approved yet` / `This bot is disabled`。接続後に承認取消・権限変更（再申請）・Bot 削除・BAN されても `ERROR`（例: `bot was deleted`）→ close される。
 - クライアント → サーバー: `{ signal: "ping", data: "pong" }` で `pong` が返る（これ以外の signal は無視される）。ヘッダ `Authorization` を付ける。
 - サーバー → クライアントの signal（Bot が受け取り得るもの）:
 
