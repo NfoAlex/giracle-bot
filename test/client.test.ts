@@ -49,6 +49,15 @@ describe("GiracleClient", () => {
     expect(got.id).toBe("m-abc");
   });
 
+  test("messageId は URL エンコードして埋め込む", async () => {
+    const { impl, calls } = mockFetch(() => okJson(makeMessage()));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    await client.getMessage("a/b?c");
+
+    expect(calls[0]?.url).toBe(`${SERVER}/ext/message/a%2Fb%3Fc`);
+  });
+
   test("404 テキストボディ → GiracleApiError(status=404, body 保持)", async () => {
     const { impl } = mockFetch(() => textRes(404, "Message not found"));
     const client = new GiracleClient(SERVER, TOKEN, impl);

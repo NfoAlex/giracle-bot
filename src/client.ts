@@ -19,10 +19,10 @@ export class GiracleClient {
     this.fetchImpl = fetchImpl ?? fetch;
   }
 
-  /** GET /ext/message/:messageId */
+  /** GET /ext/message/:messageId（id は URL エンコードして埋め込む） */
   async getMessage(messageId: string): Promise<Message> {
     const res = await this.fetchImpl(
-      `${this.baseUrl}/ext/message/${messageId}`,
+      `${this.baseUrl}/ext/message/${encodeURIComponent(messageId)}`,
       {
         headers: this.authHeaders(),
       },
