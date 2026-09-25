@@ -42,10 +42,10 @@ export class MockWebSocket implements SocketLike {
     this.onmessage?.({ data });
   }
 
-  /** サーバー側から close（異常/正常どちらでも使える） */
-  serverClose(code = 1006, reason = "abnormal closure"): void {
+  /** サーバー側から異常 close（code 1006） */
+  serverClose(): void {
     this.readyState = 3;
-    this.onclose?.({ code, reason });
+    this.onclose?.({ code: 1006, reason: "abnormal closure" });
   }
 }
 
