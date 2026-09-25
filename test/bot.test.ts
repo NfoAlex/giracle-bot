@@ -41,7 +41,7 @@ function newBot(over: Partial<BotOptions> = {}): GiracleBot {
   return new GiracleBot({
     serverUrl: SERVER,
     token: TOKEN,
-    WebSocketImpl: MockWebSocket as unknown as BotOptions["WebSocketImpl"],
+    WebSocketImpl: MockWebSocket,
     ...over,
   });
 }

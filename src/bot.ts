@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { GiracleClient } from "./client";
 import { log } from "./log";
-import { GiracleSocket, type SocketCtor } from "./ws";
+import { GiracleSocket } from "./ws";
 import type {
   BotEventMap,
   BotOptions,
@@ -75,14 +75,8 @@ export class GiracleBot extends EventEmitter {
 
     log("bot を起動");
 
-    // SAFETY: WebSocketImpl は typeof WebSocket で、実行時は SocketCtor の部分集合を満たす。
-    // DOM lib の型には headers オプションが無いため unknown を経由して絞る。
-    const wsImpl = this.options.WebSocketImpl as unknown as
-      | SocketCtor
-      | undefined;
-
     this.socket = new GiracleSocket(this.wsUrl(), this.options.token, {
-      WebSocketImpl: wsImpl,
+      WebSocketImpl: this.options.WebSocketImpl,
       pingIntervalMs: this.options.pingIntervalMs,
       reconnectBaseMs: this.options.reconnectBaseMs,
     });

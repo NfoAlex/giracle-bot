@@ -115,7 +115,6 @@ bunx tsc --noEmit && bun test
 **モックでハンドラを検証**（実サーバー不要）。`fetchImpl` と `WebSocketImpl` を注入する。
 
 ```ts
-import type { BotOptions } from "../src/types"; // 利用側プロジェクトなら "giracle-bot"
 import { GiracleBot } from "../src";
 import { MockWebSocket, makeMessage } from "../test/mockWebSocket";
 
@@ -127,7 +126,7 @@ const fetchImpl = (async (_input: unknown) =>
 
 const bot = new GiracleBot({
   serverUrl: "http://x", token: "t", botUserId: "bot-1", fetchImpl,
-  WebSocketImpl: MockWebSocket as unknown as BotOptions["WebSocketImpl"],
+  WebSocketImpl: MockWebSocket,
 });
 bot.start();
 const ws = MockWebSocket.instances.at(-1)!;

@@ -3,6 +3,8 @@
  * 実サーバーのレスポンスに合わせる（過剰な型にしない）。
  */
 
+import type { SocketCtor } from "./ws";
+
 /** メッセージ行（GET /ext/message/:id と WS signal の data） */
 export type Message = {
   id: string;
@@ -66,7 +68,7 @@ export type BotOptions = {
  botUserId?: string;
  /** テスト用差し替え口。省略時はグローバル fetch / WebSocket */
  fetchImpl?: typeof fetch;
- WebSocketImpl?: typeof WebSocket;
+ WebSocketImpl?: SocketCtor;
  /** ping 送信間隔 ms（既定 30_000） */
  pingIntervalMs?: number;
  /** 再接続バックオフ初期値 ms（既定 1_000、上限 60_000 固定） */

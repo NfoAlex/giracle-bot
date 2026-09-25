@@ -27,7 +27,7 @@ function makeSocket(
   } = {},
 ): GiracleSocket {
   const s = new GiracleSocket(URL, TOKEN, {
-    WebSocketImpl: MockWebSocket as never,
+    WebSocketImpl: MockWebSocket,
     ...over,
   });
   sockets.push(s);
@@ -138,7 +138,7 @@ describe("GiracleSocket ERROR / 再接続", () => {
     }
 
     const s = new GiracleSocket(URL, TOKEN, {
-      WebSocketImpl: FlakySocket as never,
+      WebSocketImpl: FlakySocket,
       reconnectBaseMs: 10,
     });
     sockets.push(s);
