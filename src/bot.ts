@@ -11,6 +11,15 @@ import type {
   Message,
 } from "./types";
 
+/** 文字列フィールドの型ガード（例: hasStr(data, "id")）。フレームワークが使う列だけ検証する */
+function hasStr(data: unknown, key: string): data is Record<string, unknown> {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    typeof (data as Record<string, unknown>)[key] === "string"
+  );
+}
+
 /**
  * Bot の本体。HTTP クライアント + WS 接続 + イベント発火を束ねる。
  * remoteUserId が既知（botUserId 設定 or 初回 sendMessage キャッシュ）のときは
@@ -170,42 +179,23 @@ export class GiracleBot extends EventEmitter {
   private handleSignal(env: { signal: string; data: unknown }): void {
     switch (env.signal) {
       case "message::SendMessage": {
-        const data = env.data;
-
         // フレームワークが使うフィールドのみ検証する。不正 payload は黙って捨てる。
-        if (
-          typeof data !== "object" ||
-          data === null ||
-          !("id" in data) ||
-          typeof data.id !== "string" ||
-          !("userId" in data) ||
-          typeof data.userId !== "string"
-        ) {
-          return;
-        }
+        if (!hasStr(env.data, "id") || !hasStr(env.data, "userId")) return;
 
-        // SAFETY: 直上で id / userId の型を検証済み。他フィールドは利用側の責務。
-        const msg = data as Message;
-
-        this.dispatchMessage(msg);
+        // SAFETY: 直上で id / userId を検証済み。他フィールドは利用側の責務。
+        this.dispatchMessage(env.data as Message);
 
         return;
       }
       case "message::UpdateMessage": {
-        const data = env.data;
-
         // フレームワークが使うフィールドのみ検証する。不正 payload は黙って捨てる。
-        if (
-          typeof data !== "object" ||
-          data === null ||
-          !("id" in data) ||
-          typeof data.id !== "string"
-        ) {
-          return;
-        }
+        if (!hasStr(env.data, "id")) return;
 
-        // SAFETY: 直上で id の型を検証済み。他フィールドは利用側の責務。
-        this.emit("messageUpdate", data as Partial<Message> & { id: string });
+        // SAFETY: 直上で id を検証済み。他フィールドは利用側の責務。
+        this.emit(
+          "messageUpdate",
+          env.data as Partial<Message> & { id: string },
+        );
 
         return;
       }
