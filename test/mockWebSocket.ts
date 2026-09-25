@@ -62,6 +62,7 @@ export function makeMessage(over: Partial<Message> = {}): Message {
     channelId: "c1",
     userId: "u1",
     content: "hello",
+    isSystemMessage: false,
     replyingMessageId: null,
     isBot: false,
     isEdited: false,

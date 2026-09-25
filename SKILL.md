@@ -41,7 +41,7 @@ await bot.deleteMessage(targetMessageId);              // DeleteResult（自分�
 
 | イベント | ペイロード | 注意 |
 | --- | --- | --- |
-| `message` | `Message` | 新規投稿。**自己送信は `remoteUserId` 確定後のみ**フレームワークが除外（確定前かつ送信中は保留してから判定） |
+| `message` | `Message` | 新規投稿。**自己送信は `remoteUserId` 確定後のみ**フレームワークが除外（確定前かつ送信中は保留してから判定）。システムメッセージも含む |
 | `messageUpdate` | `Partial<Message> & { id: string }` | 編集 と URL プレビュー生成の両方で飛ぶ。`isEdited === true` で判別 |
 | `inbox` | `{ message, type }` | `inbox::Added` |
 | `error` | `Error` | HTTP 失敗 / WS `ERROR` signal / 異常切断 |
@@ -64,6 +64,7 @@ const bot = new GiracleBot({
 bot.on("message", async (msg) => {
   if (!bot.remoteUserId) return;                       // 身元未確定なら何もしない（安全側）
   if (msg.userId === bot.remoteUserId) return;         // 自己送信ガード（ループ防止・必須）
+  if (msg.isSystemMessage) return;                     // 入退室等のシステムメッセージ（content は JSON 文字列）
   if (msg.isBot) return;                               // Bot 同士の応酬を避けるなら
 
   if (msg.content.trim() !== "!ping") return;
@@ -84,7 +85,7 @@ function report(err: unknown) {
 ## 3. 落とし穴（ここを外すと本番で壊れる）
 
 1. **自己送信ガードは必須。** `message::SendMessage` は Bot 自身の HTTP 送信でも配信される。フレームワークは送信中の echo を `remoteUserId` 確定まで保留して判定するが、`botUserId` 未指定なら初回 `sendMessage` 確定前に届いた自分の投稿は素通しする。echo 型 Bot は `botUserId` を必ず設定し、さらに `if (!bot.remoteUserId) return;` を先頭に置く。
-2. **`messageUpdate` を編集と決め打ちしない。** `send`/`edit` 直後の URL プレビュー生成でも飛ぶ。`update.isEdited` を見る。また差分ペイロードに `channelId` が無いことがある → 返信したいなら `await bot.getMessage(update.id)` で完全な `Message` を取り直す。
+2. **`messageUpdate` を編集と決め打ちしない。** `send`/`edit` 直後の URL プレビュー生成でも飛ぶ。`update.isEdited` を見る。また差分ペイロードは部分行（編集は `{id, channelId, content, isEdited, userId}`、URL プレビューは `MessageFileAttached` 等が欠ける）→ 完全な `Message` が要るなら `await bot.getMessage(update.id)` で取り直す。
 3. **エラー分岐は `err.status` のみ。** `err.body` の文言はサーバー実装依存。401 = token 不正 or 未承認、403 = `can*` 権限不足 / チャンネル未許可 / 他人のメッセージ、404 = 存在しない or 許可外、400 = 空・長すぎ・返信先なし・同内容編集。文言で `if (body.includes(...))` を書かない。
 4. **削除前に所有者確認。** `deleteMessage` は自分の送信分しか消せない（他人のは 403）。`example/delete-bot.ts` のように `getMessage` して `userId === bot.remoteUserId` を確認してから消す。
 5. **`ERROR` signal は fatal。** 再接続しない（`error` → `close`）。401 が続く場合は token か承認状態を疑い、コードではなく運用（管理者への確認）を促す。
@@ -93,6 +94,7 @@ function report(err: unknown) {
 8. **メンションは `@<userId>` 文字列。** 通知はサーバー側処理済み。`replaceAll(\`@${bot.remoteUserId}\`, "")` で本文を抽出（`example/reply-bot.ts`）。
 9. **Bun 専用・依存ゼロ。** `fetch` / `WebSocket` はネイティブ。npm パッケージを足さない。Node API 前提のライブラリ（`ws`, `node-fetch` 等）も不要。
 10. **SQLite 書き込み競合。** 連投・全チャンネル一斉送信は避ける。必要なら Bot 側で送信間隔を空ける（フレームワークに連投抑制は無い）。
+11. **システムメッセージを応答対象にしない。** `isSystemMessage: true`（`userId: "SYSTEM"`、`content` は JSON 文字列）が `message` に流れる。`if (msg.isSystemMessage) return;` をガードに足す。
 
 ## 4. 実装パターン
 
@@ -139,7 +141,7 @@ ws.receive(JSON.stringify({ signal: "message::SendMessage", data: makeMessage({ 
 ## 6. 完了チェックリスト
 
 - [ ] イベント名・型を `src/types.ts` と照合した
-- [ ] 全ハンドラの先頭に自己送信ガード（`!bot.remoteUserId` → `userId === bot.remoteUserId`）
+- [ ] 全ハンドラの先頭に自己送信ガード（`!bot.remoteUserId` → `userId === bot.remoteUserId`）と `isSystemMessage` ガード
 - [ ] `error` ハンドラを登録し、HTTP 例外を catch した
 - [ ] `err.status` で分岐（文言に依存していない）
 - [ ] `messageUpdate` は `isEdited` を確認している

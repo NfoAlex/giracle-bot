@@ -5,16 +5,26 @@
 
 /** メッセージ行（GET /ext/message/:id と WS signal の data） */
 export type Message = {
- id: string;
- channelId: string;
- userId: string;
- content: string;
- replyingMessageId: string | null;
- isBot: boolean;
- isEdited: boolean;
- createdAt: string; // ponytail: 実サーバー未確認。curl で確定次第修正
- MessageUrlPreview: unknown[];
- MessageFileAttached: unknown[];
+  id: string;
+  channelId: string;
+  /** システムメッセージは "SYSTEM" */
+  userId: string;
+  /** システムメッセージは JSON 文字列（例: {"targetUserId":"u1","messageTerm":"CHANNEL_JOIN"}） */
+  content: string;
+  /** 入退室等のシステムメッセージ。応答する Bot はこの判定で弾く */
+  isSystemMessage: boolean;
+  isBot: boolean;
+  isEdited: boolean;
+  replyingMessageId: string | null;
+  /** ISO 8601（サーバーは timestamp_ms の Date を JSON 文字列化して返す） */
+  createdAt: string;
+  /**
+   * HTTP（GET / send）には常に配列で付くが、WS signal では配信経路により欠ける。
+   * 例: 通常ユーザーの send は MessageFileAttached のみ、URL プレビュー差分は
+   * MessageUrlPreview のみ、システムメッセージは両方無し。
+   */
+  MessageUrlPreview?: unknown[];
+  MessageFileAttached?: unknown[];
 };
 
 /** POST /ext/message/edit の部分行レスポンス */
@@ -66,7 +76,7 @@ export type BotOptions = {
 
 /** GiracleBot のイベントマップ（EventEmitter の on/emit に使用） */
 export type BotEventMap = {
- /** message::SendMessage — 自分の送信分も流れる。self filter 済み */
+ /** message::SendMessage — 自分の送信分も流れる。self filter 済み。システムメッセージも流れる */
  message: [message: Message];
  /** message::UpdateMessage — 編集部分行 or URL プレビュー差分（isEdited で判別） */
  messageUpdate: [message: Partial<Message> & { id: string }];

@@ -71,11 +71,13 @@ Bot開発者                 Giracleサーバー
 
 | signal | data |
 | --- | --- |
-| `message::SendMessage` | メッセージ行（自分の送信分も含む。`data.userId === bot.remoteUserId` で自己送信を判別） |
+| `message::SendMessage` | メッセージ行（自分の送信分も含む。`data.userId === bot.remoteUserId` で自己送信を判別。システムメッセージも含む → `isSystemMessage: true` / `userId: "SYSTEM"` / `content` は JSON 文字列） |
 | `message::UpdateMessage` | 編集後メッセージ（編集は部分行、URLプレビューは差分行） |
 | `inbox::Added` | `{ message, type }` |
 | `pong` | `"pong"` |
 | `ERROR` | エラー文言 |
+
+- メッセージ行の `MessageUrlPreview` / `MessageFileAttached` は HTTP（GET / send）には常に配列で付くが、WS signal では配信経路により欠ける（通常ユーザーの send は `MessageFileAttached` のみ、URL プレビュー差分は `MessageUrlPreview` のみ、システムメッセージは両方無し）。
 
 - ペイロードは原則文字列 JSON（publish は `JSON.stringify`、`ws.send` も送出時に文字列化される）。受信側は `JSON.parse` を try し、失敗時はそのまま扱う正規化を入れること。
 
@@ -129,18 +131,24 @@ bot.start();
 type Message = {
   id: string;
   channelId: string;
+  /** システムメッセージは "SYSTEM" */
   userId: string;
+  /** システムメッセージは JSON 文字列 */
   content: string;
-  replyingMessageId: string | null;
+  /** 入退室等のシステムメッセージ */
+  isSystemMessage: boolean;
   isBot: boolean;
   isEdited: boolean;
-  createdAt: string; // 実レスポンスの型は生成時に確認
-  MessageUrlPreview: unknown[];
-  MessageFileAttached: unknown[];
+  replyingMessageId: string | null;
+  /** ISO 8601（timestamp_ms の Date を JSON 文字列化） */
+  createdAt: string;
+  /** HTTP には常に配列で付くが、WS signal では欠けることがある */
+  MessageUrlPreview?: unknown[];
+  MessageFileAttached?: unknown[];
 };
 ```
 
-`createdAt` 等の日時・細部の型は、実サーバーに curl を打って確認してから確定する（推測で書かない）。
+`createdAt` は `timestamp_ms`（Date）→ ISO 8601 文字列。実装で確認済み。
 
 ### 2.4 ディレクトリ構成（目安）
 

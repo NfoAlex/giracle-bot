@@ -62,7 +62,7 @@ Claude Code / 同種のエージェントでは `SKILL.md` をスキルとして
 
 | イベント | ペイロード | 説明 |
 | --- | --- | --- |
-| `message` | `Message` | 新規メッセージ（自己送信は `remoteUserId` 確定後にフィルタ。確定前かつ送信中は保留してから判定） |
+| `message` | `Message` | 新規メッセージ（自己送信は `remoteUserId` 確定後にフィルタ。確定前かつ送信中は保留してから判定）。システムメッセージも流れる（注意事項参照） |
 | `messageUpdate` | `Message` 差分 | 編集 / URL プレビュー生成後の更新。`isEdited` で判別 |
 | `inbox` | `InboxAdded` | inbox::Added |
 | `error` | `Error` | HTTP/WS エラー。`ERROR` signal（トークン無効・未承認）受信時は**再接続しない**。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
@@ -108,3 +108,5 @@ bun run build
 
 - echo ボットは必ず自己送信ガードを入れる（上記サンプル参照）
 - `send` 直後に URL プレビュー生成で `messageUpdate` が飛ぶ。編集と誤認しない（`isEdited` で判別）
+- システムメッセージ（`isSystemMessage: true` / `userId: "SYSTEM"` / `content` は JSON 文字列）も `message` に流れる。応答する Bot は `msg.isSystemMessage` で弾く
+- WS の `Message` は `MessageUrlPreview` / `MessageFileAttached` を持たないことがある（HTTP の GET / send には常に付く）
