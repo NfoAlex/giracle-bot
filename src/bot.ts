@@ -22,6 +22,9 @@ export class GiracleBot extends EventEmitter {
   private socket: GiracleSocket | null = null;
   private closed = false;
   private cachedUserId: string | undefined;
+  /** identity 未確定時の echo race 回避: 送信中の message signal を一時保留 */
+  private held: Message[] = [];
+  private sending = 0;
 
   constructor(options: BotOptions) {
     super();
@@ -130,15 +133,22 @@ export class GiracleBot extends EventEmitter {
     message: string,
     replyingMessageId?: string,
   ): Promise<Message> {
-    const res = await this.client.sendMessage(
-      channelId,
-      message,
-      replyingMessageId,
-    );
+    this.sending += 1;
 
-    this.cachedUserId ??= res.userId;
+    try {
+      const res = await this.client.sendMessage(
+        channelId,
+        message,
+        replyingMessageId,
+      );
 
-    return res;
+      this.cachedUserId ??= res.userId;
+
+      return res;
+    } finally {
+      this.sending -= 1;
+      this.flushHeld();
+    }
   }
 
   /** POST /ext/message/edit */
@@ -175,15 +185,7 @@ export class GiracleBot extends EventEmitter {
         // SAFETY: 直上で id / userId の型を検証済み。他フィールドは利用側の責務。
         const msg = data as Message;
 
-        // 自己送信はフィルタ（echo 無限ループ防止）。identity 未確定時は素通し。
-        if (
-          this.remoteUserId !== undefined &&
-          msg.userId === this.remoteUserId
-        ) {
-          return;
-        }
-
-        this.emit("message", msg);
+        this.dispatchMessage(msg);
 
         return;
       }
@@ -213,5 +215,35 @@ export class GiracleBot extends EventEmitter {
         // "pong" / "raw" / 未知 signal は無視
         return;
     }
+  }
+
+  /**
+   * message の判定。自己送信はフィルタ（echo 無限ループ防止）。
+   * 自己 echo は HTTP レスポンスより先に届き得るため、identity 未確定かつ
+   * 送信中は保留し、送信完了で identity が判明してから判定する。
+   * 例: 初回 sendMessage 中に届いた自分の echo を誤って emit しない。
+   */
+  private dispatchMessage(msg: Message): void {
+    if (this.cachedUserId === undefined && this.sending > 0) {
+      this.held.push(msg);
+
+      return;
+    }
+
+    if (this.remoteUserId !== undefined && msg.userId === this.remoteUserId) {
+      return;
+    }
+
+    this.emit("message", msg);
+  }
+
+  /** 保留中の message を再判定して放出（他人の分は取りこぼさない） */
+  private flushHeld(): void {
+    if (this.sending > 0 || this.held.length === 0) return;
+
+    const held = this.held;
+    this.held = [];
+
+    for (const msg of held) this.dispatchMessage(msg);
   }
 }

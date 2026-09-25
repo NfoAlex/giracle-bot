@@ -114,6 +114,82 @@ describe("GiracleBot", () => {
     expect((messages[0] as { userId: string }).userId).toBe("bob");
   });
 
+  test("自己 echo が HTTP レスポンスより先に届いても message は発火しない（identity race）", async () => {
+    // send の応答を遅延させ、その間に自己 echo の signal が届く状況を作る
+    let resolveSend: ((res: Response) => void) | undefined;
+    const fetchImpl = ((input: unknown) => {
+      if (!String(input).endsWith("/ext/message/send")) {
+        return Promise.resolve(new Response("no", { status: 404 }));
+      }
+
+      return new Promise<Response>((r) => (resolveSend = r));
+    }) as typeof fetch;
+    const b = newBot({ fetchImpl });
+    bot = b;
+    const messages: unknown[] = [];
+    b.on("message", (m) => messages.push(m));
+    b.start();
+
+    const sent = b.sendMessage("c1", "hi");
+    latestMock().receive(
+      JSON.stringify({
+        signal: "message::SendMessage",
+        data: makeMessage({ userId: "alice", content: "hi" }),
+      }),
+    );
+
+    // 未確定かつ送信中なので保留（まだ emit しない）
+    expect(messages).toHaveLength(0);
+
+    resolveSend?.(
+      new Response(JSON.stringify(makeMessage({ userId: "alice" })), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await sent;
+
+    expect(b.remoteUserId).toBe("alice");
+    expect(messages).toHaveLength(0); // 保留分は自己送信と判定され捨てる
+  });
+
+  test("送信中に届いた他人の message は取りこぼさず、送信完了後に発火する", async () => {
+    let resolveSend: ((res: Response) => void) | undefined;
+    const fetchImpl = ((input: unknown) => {
+      if (!String(input).endsWith("/ext/message/send")) {
+        return Promise.resolve(new Response("no", { status: 404 }));
+      }
+
+      return new Promise<Response>((r) => (resolveSend = r));
+    }) as typeof fetch;
+    const b = newBot({ fetchImpl });
+    bot = b;
+    const messages: unknown[] = [];
+    b.on("message", (m) => messages.push(m));
+    b.start();
+
+    const sent = b.sendMessage("c1", "hi");
+    latestMock().receive(
+      JSON.stringify({
+        signal: "message::SendMessage",
+        data: makeMessage({ id: "m9", userId: "bob" }),
+      }),
+    );
+
+    expect(messages).toHaveLength(0); // 保留中
+
+    resolveSend?.(
+      new Response(JSON.stringify(makeMessage({ userId: "alice" })), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await sent;
+
+    expect(messages).toHaveLength(1); // 他人の分は emit される
+    expect((messages[0] as { id: string }).id).toBe("m9");
+  });
+
   test("messageUpdate / inbox のマッピング", () => {
     const b = newBot({ botUserId: "me" });
     bot = b;
