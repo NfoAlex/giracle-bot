@@ -25,8 +25,8 @@ const bot = new GiracleBot({
 });
 
 bot.on("message", (msg) => {
-  // remoteUserId が確定している間は自己送信がフレームワーク側でフィルタされるが、
-  // 確定前は流れるのでガードしておくのが安全（echo 無限ループ防止）
+  // remoteUserId 確定後は自己送信がフレームワーク側でフィルタされる（送信中の echo は
+  // 確定まで保留）。botUserId 未設定時の確定前は流れるので、ガードしておくのが安全
   if (msg.userId === bot.remoteUserId) return;
 
   bot.sendMessage(msg.channelId, `echo: ${msg.content}`);
@@ -54,6 +54,7 @@ Claude Code / 同種のエージェントでは `SKILL.md` をスキルとして
 | `getMessage(messageId)` | メッセージ 1 件取得 |
 | `sendMessage(channelId, message, replyingMessageId?)` | 送信 |
 | `editMessage(targetMessageId, message)` | 編集 |
+| `deleteMessage(targetMessageId)` | 削除（自分の送信分のみ） |
 
 エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。
 
@@ -61,7 +62,7 @@ Claude Code / 同種のエージェントでは `SKILL.md` をスキルとして
 
 | イベント | ペイロード | 説明 |
 | --- | --- | --- |
-| `message` | `Message` | 新規メッセージ（自己送信は `remoteUserId` 確定後にフィルタ） |
+| `message` | `Message` | 新規メッセージ（自己送信は `remoteUserId` 確定後にフィルタ。確定前かつ送信中は保留してから判定） |
 | `messageUpdate` | `Message` 差分 | 編集 / URL プレビュー生成後の更新。`isEdited` で判別 |
 | `inbox` | `InboxAdded` | inbox::Added |
 | `error` | `Error` | HTTP/WS エラー。`ERROR` signal（トークン無効・未承認）受信時は**再接続しない**。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |

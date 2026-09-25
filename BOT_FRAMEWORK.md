@@ -118,7 +118,7 @@ bot.start();
 3. **イベント** — `message` / `messageUpdate` / `inbox` / `error` / `close` の最低 5 種。Node 標準 `EventEmitter` か自前の薄い `Map<string, Set<fn>>` で良い。
 4. **自己送信フィルタ** — `start()` 時に `GET /ext` なしで remoteUserId が分からないため、WS 接続後にサーバーへ `Authorization` トークン照合の結果として `bot.remoteUserId` を取得する手段が無い。**`bot.remoteUserId` は利用者に設定させるか、最初の自己送信 signal から推定する。** 仕様上 `CheckApiCode` コンテキストに remoteUserId があるが HTTP でそれを返すエンドポイントは無いため、設定項目 `botUserId`（省略可）とする。省略時は自己フィルタ無効。
 
-   → 実装時に要検討: 最初に `sendMessage` した際のレスポンス `userId` を remoteUserId としてキャッシュするのが最も簡単。
+   → 実装済: 最初に `sendMessage` した際のレスポンス `userId` を remoteUserId としてキャッシュする。なお WS の自己 echo は HTTP レスポンスより先に届き得るため、identity 未確定かつ送信中の `message::SendMessage` は確定まで保留してから自己送信判定する（race による二重 echo の防止）。
 5. **依存はゼロで作る。** Bun は `fetch` / `WebSocket` をネイティブ持つため、npm パッケージ不要。
 
 ### 2.3 型定義

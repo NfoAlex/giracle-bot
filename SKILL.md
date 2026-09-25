@@ -41,7 +41,7 @@ await bot.deleteMessage(targetMessageId);              // DeleteResult（自分�
 
 | イベント | ペイロード | 注意 |
 | --- | --- | --- |
-| `message` | `Message` | 新規投稿。**自己送信は `remoteUserId` 確定後のみ**フレームワークが除外 |
+| `message` | `Message` | 新規投稿。**自己送信は `remoteUserId` 確定後のみ**フレームワークが除外（確定前かつ送信中は保留してから判定） |
 | `messageUpdate` | `Partial<Message> & { id: string }` | 編集 と URL プレビュー生成の両方で飛ぶ。`isEdited === true` で判別 |
 | `inbox` | `{ message, type }` | `inbox::Added` |
 | `error` | `Error` | HTTP 失敗 / WS `ERROR` signal / 異常切断 |
@@ -83,7 +83,7 @@ function report(err: unknown) {
 
 ## 3. 落とし穴（ここを外すと本番で壊れる）
 
-1. **自己送信ガードは必須。** `message::SendMessage` は Bot 自身の HTTP 送信でも配信される。`botUserId` 未指定の間は `remoteUserId === undefined` でフィルタが無効なので、echo 型 Bot は無限ループする。`botUserId` を設定し、かつ `if (!bot.remoteUserId) return;` を先頭に置く。
+1. **自己送信ガードは必須。** `message::SendMessage` は Bot 自身の HTTP 送信でも配信される。フレームワークは送信中の echo を `remoteUserId` 確定まで保留して判定するが、`botUserId` 未指定なら初回 `sendMessage` 確定前に届いた自分の投稿は素通しする。echo 型 Bot は `botUserId` を必ず設定し、さらに `if (!bot.remoteUserId) return;` を先頭に置く。
 2. **`messageUpdate` を編集と決め打ちしない。** `send`/`edit` 直後の URL プレビュー生成でも飛ぶ。`update.isEdited` を見る。また差分ペイロードに `channelId` が無いことがある → 返信したいなら `await bot.getMessage(update.id)` で完全な `Message` を取り直す。
 3. **エラー分岐は `err.status` のみ。** `err.body` の文言はサーバー実装依存。401 = token 不正 or 未承認、403 = `can*` 権限不足 / チャンネル未許可 / 他人のメッセージ、404 = 存在しない or 許可外、400 = 空・長すぎ・返信先なし・同内容編集。文言で `if (body.includes(...))` を書かない。
 4. **削除前に所有者確認。** `deleteMessage` は自分の送信分しか消せない（他人のは 403）。`example/delete-bot.ts` のように `getMessage` して `userId === bot.remoteUserId` を確認してから消す。
