@@ -190,6 +190,17 @@ describe("GiracleBot", () => {
     expect((messages[0] as { id: string }).id).toBe("m9");
   });
 
+  test("start 前の stop() では close を発火しない", () => {
+    const b = newBot({ botUserId: "me" });
+    bot = b;
+    let closed = 0;
+    b.on("close", () => (closed += 1));
+
+    b.stop();
+
+    expect(closed).toBe(0);
+  });
+
   test("messageUpdate / inbox のマッピング", () => {
     const b = newBot({ botUserId: "me" });
     bot = b;

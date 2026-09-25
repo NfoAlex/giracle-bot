@@ -91,11 +91,13 @@ export class GiracleBot extends EventEmitter {
     this.socket.start();
   }
 
-  /** 明示的に切断 */
+  /** 明示的に切断（未接続なら何もしない） */
   stop(): void {
-    if (this.socket) log("bot を停止");
+    if (!this.socket) return;
 
-    this.socket?.stop();
+    log("bot を停止");
+
+    this.socket.stop();
     this.socket = null;
     this.emitClose();
   }
