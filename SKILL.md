@@ -24,7 +24,7 @@ const bot = new GiracleBot({
   serverUrl: "http://localhost:3000", // 末尾スラッシュ可、http→ws は内部変換
   token: process.env.BOT_TOKEN!,      // BotManage.tokenCode。Bearer 不要、生値を Authorization に載せる
   botUserId: process.env.BOT_USER_ID, // 省略可。強く推奨（後述）
-  // テスト用: fetchImpl / WebSocketImpl / pingIntervalMs / reconnectBaseMs / reconnectMaxMs
+  // テスト用: fetchImpl / WebSocketImpl / pingIntervalMs / reconnectBaseMs
 });
 
 bot.start();                       // WS 接続開始（戻り値なし、非同期の完了通知もない）

@@ -69,9 +69,8 @@ export type BotOptions = {
  WebSocketImpl?: typeof WebSocket;
  /** ping 送信間隔 ms（既定 30_000） */
  pingIntervalMs?: number;
- /** 再接続バックオフ初期値 ms（既定 1_000、上限 reconnectMaxMs=60_000） */
+ /** 再接続バックオフ初期値 ms（既定 1_000、上限 60_000 固定） */
  reconnectBaseMs?: number;
- reconnectMaxMs?: number;
 };
 
 /** GiracleBot のイベントマップ（EventEmitter の on/emit に使用） */

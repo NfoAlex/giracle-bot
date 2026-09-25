@@ -85,7 +85,6 @@ export class GiracleBot extends EventEmitter {
       WebSocketImpl: wsImpl,
       pingIntervalMs: this.options.pingIntervalMs,
       reconnectBaseMs: this.options.reconnectBaseMs,
-      reconnectMaxMs: this.options.reconnectMaxMs,
     });
     this.socket.onSignal = (env) => this.handleSignal(env);
     this.socket.onError = (err) => {

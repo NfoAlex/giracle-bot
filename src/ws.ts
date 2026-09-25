@@ -27,7 +27,6 @@ export type GiracleSocketOptions = {
   WebSocketImpl?: SocketCtor;
   pingIntervalMs?: number;
   reconnectBaseMs?: number;
-  reconnectMaxMs?: number;
 };
 
 /** 指数バックオフの遅延(ms)。上限 max を超えない純関数（テスト容易性のため切り出し） */
@@ -197,8 +196,7 @@ export class GiracleSocket {
 
   private scheduleReconnect(): void {
     const base = this.opts.reconnectBaseMs ?? DEFAULT_BASE;
-    const max = this.opts.reconnectMaxMs ?? DEFAULT_MAX;
-    const delay = nextBackoffMs(this.attempt, base, max);
+    const delay = nextBackoffMs(this.attempt, base, DEFAULT_MAX);
 
     log(`再接続を予約: ${delay}ms 後 (attempt ${this.attempt + 1})`);
 

@@ -24,7 +24,6 @@ function makeSocket(
   over: {
     pingIntervalMs?: number;
     reconnectBaseMs?: number;
-    reconnectMaxMs?: number;
   } = {},
 ): GiracleSocket {
   const s = new GiracleSocket(URL, TOKEN, {
@@ -98,7 +97,7 @@ describe("GiracleSocket ERROR / 再接続", () => {
   });
 
   test("異常 close → 自動再接続（小さい baseMs で実際に新接続される）", async () => {
-    const s = makeSocket({ reconnectBaseMs: 10, reconnectMaxMs: 60_000 });
+    const s = makeSocket({ reconnectBaseMs: 10 });
     s.start();
     const ws0 = latestMock();
     ws0.open(); // attempt reset → 0
@@ -113,7 +112,7 @@ describe("GiracleSocket ERROR / 再接続", () => {
   });
 
   test("正常な OPEN 後にバックオフ遅延はリセットされる（attempt が進んでも開通で 0 に）", async () => {
-    const s = makeSocket({ reconnectBaseMs: 10, reconnectMaxMs: 60_000 });
+    const s = makeSocket({ reconnectBaseMs: 10 });
     s.start();
     const ws0 = latestMock();
     ws0.open();
@@ -141,7 +140,6 @@ describe("GiracleSocket ERROR / 再接続", () => {
     const s = new GiracleSocket(URL, TOKEN, {
       WebSocketImpl: FlakySocket as never,
       reconnectBaseMs: 10,
-      reconnectMaxMs: 60_000,
     });
     sockets.push(s);
 
@@ -181,7 +179,6 @@ describe("GiracleSocket ping", () => {
     const s = makeSocket({
       pingIntervalMs: 15,
       reconnectBaseMs: 10,
-      reconnectMaxMs: 60_000,
     });
     s.start();
     const ws = latestMock();
