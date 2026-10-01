@@ -59,8 +59,8 @@ export class GiracleSocket {
   private ws: SocketLike | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private stopped = false;
-  private fatalError = false;
+  /** stop() または ERROR signal 後は再接続しない */
+  private noReconnect = false;
   private attempt = 0;
   /** 最後に pong を受けた時刻（半死接続の検知に使う） */
   private lastPongAt = 0;
@@ -73,15 +73,14 @@ export class GiracleSocket {
 
   /** 接続開始（明示的な停止前は切断時も自動再接続する） */
   start(): void {
-    this.stopped = false;
-    this.fatalError = false;
+    this.noReconnect = false;
     this.attempt = 0;
     this.connect();
   }
 
   /** 明示的に切断（ping・再接続タイマーを止め、以後再接続しない） */
   stop(): void {
-    this.stopped = true;
+    this.noReconnect = true;
     this.clearPing();
     this.clearReconnect();
 
@@ -96,11 +95,9 @@ export class GiracleSocket {
       this.opts.WebSocketImpl ?? (WebSocket as unknown as SocketCtor);
     let ws: SocketLike;
 
-    if (this.attempt > 0) {
-      log(`再接続を試行 (attempt ${this.attempt}): ${this.url}`);
-    } else {
-      log(`接続開始: ${this.url}`);
-    }
+    const label = this.attempt > 0 ? `再接続を試行 (attempt ${this.attempt})` : "接続開始";
+
+    log(`${label}: ${this.url}`);
 
     try {
       ws = new ctor(this.url, { headers: { Authorization: this.token } });
@@ -128,14 +125,8 @@ export class GiracleSocket {
       const code = ev?.code;
       const reason = ev?.reason;
 
-      if (this.fatalError) {
-        log("切断を検知 (fatal のため再接続しない)");
-
-        return;
-      }
-
-      if (this.stopped) {
-        log("切断を検知 (停止済みのため再接続しない)");
+      if (this.noReconnect) {
+        log("切断を検知 (再接続しない)");
 
         return;
       }
@@ -164,7 +155,7 @@ export class GiracleSocket {
       // トークン無効・未承認・canReadMessage 無し・BAN/削除。再接続しても同じ結果なので fatal 扱いで止める。
       log(`ERROR signal を受信: ${String(env.data)} → 再接続しない`);
 
-      this.fatalError = true;
+      this.noReconnect = true;
       this.clearPing();
 
       this.onError?.(new Error(String(env.data)));

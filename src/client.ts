@@ -21,14 +21,10 @@ export class GiracleClient {
 
   /** GET /ext/message/:messageId（id は URL エンコードして埋め込む） */
   async getMessage(messageId: string): Promise<Message> {
-    const res = await this.fetchImpl(
-      `${this.baseUrl}/ext/message/${encodeURIComponent(messageId)}`,
-      {
-        headers: this.authHeaders(),
-      },
-    );
-
-    return (await this.handle(res)) as Message;
+    return (await this.call(
+      `/ext/message/${encodeURIComponent(messageId)}`,
+      "GET",
+    )) as Message;
   }
 
   /** POST /ext/message/send。ボディ: { channelId, message, replyingMessageId? }（undefined は JSON 化で消える） */
@@ -37,13 +33,11 @@ export class GiracleClient {
     message: string,
     replyingMessageId?: string,
   ): Promise<Message> {
-    const res = await this.fetchImpl(`${this.baseUrl}/ext/message/send`, {
-      method: "POST",
-      headers: { ...this.authHeaders(), ...JSON_HEADERS },
-      body: JSON.stringify({ channelId, message, replyingMessageId }),
-    });
-
-    return (await this.handle(res)) as Message;
+    return (await this.call("/ext/message/send", "POST", {
+      channelId,
+      message,
+      replyingMessageId,
+    })) as Message;
   }
 
   /** POST /ext/message/edit。ボディ: { targetMessageId, message } */
@@ -51,24 +45,35 @@ export class GiracleClient {
     targetMessageId: string,
     message: string,
   ): Promise<EditResult> {
-    const res = await this.fetchImpl(`${this.baseUrl}/ext/message/edit`, {
-      method: "POST",
-      headers: { ...this.authHeaders(), ...JSON_HEADERS },
-      body: JSON.stringify({ targetMessageId, message }),
-    });
-
-    return (await this.handle(res)) as EditResult;
+    return (await this.call("/ext/message/edit", "POST", {
+      targetMessageId,
+      message,
+    })) as EditResult;
   }
 
   /** DELETE /ext/message/delete。ボディ: { targetMessageId }。自分の送信メッセージのみ削除可 */
   async deleteMessage(targetMessageId: string): Promise<DeleteResult> {
-    const res = await this.fetchImpl(`${this.baseUrl}/ext/message/delete`, {
-      method: "DELETE",
-      headers: { ...this.authHeaders(), ...JSON_HEADERS },
-      body: JSON.stringify({ targetMessageId }),
+    return (await this.call("/ext/message/delete", "DELETE", {
+      targetMessageId,
+    })) as DeleteResult;
+  }
+
+  /** body 省略時は content-type を付けない（GET 用） */
+  private async call(
+    path: string,
+    method: string,
+    body?: Record<string, unknown>,
+  ): Promise<unknown> {
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      method,
+      headers:
+        body === undefined
+          ? this.authHeaders()
+          : { ...this.authHeaders(), ...JSON_HEADERS },
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-    return (await this.handle(res)) as DeleteResult;
+    return this.handle(res);
   }
 
   /**

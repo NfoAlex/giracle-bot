@@ -75,11 +75,15 @@ export class GiracleBot extends EventEmitter {
 
     log("bot を起動");
 
-    this.socket = new GiracleSocket(this.wsUrl(), this.options.token, {
-      WebSocketImpl: this.options.WebSocketImpl,
-      pingIntervalMs: this.options.pingIntervalMs,
-      reconnectBaseMs: this.options.reconnectBaseMs,
-    });
+    this.socket = new GiracleSocket(
+      `${this.options.serverUrl.replace(/\/+$/, "").replace(/^http/, "ws")}/ext/ws`,
+      this.options.token,
+      {
+        WebSocketImpl: this.options.WebSocketImpl,
+        pingIntervalMs: this.options.pingIntervalMs,
+        reconnectBaseMs: this.options.reconnectBaseMs,
+      },
+    );
     this.socket.onSignal = (env) => this.handleSignal(env);
     this.socket.onOpen = () => this.emit("open");
     this.socket.onError = (err) => {
@@ -164,10 +168,6 @@ export class GiracleBot extends EventEmitter {
   /** DELETE /ext/message/delete。自分の送信メッセージのみ削除可 */
   deleteMessage(targetMessageId: string): Promise<DeleteResult> {
     return this.client.deleteMessage(targetMessageId);
-  }
-
-  private wsUrl(): string {
-    return `${this.options.serverUrl.replace(/\/+$/, "").replace(/^http/, "ws")}/ext/ws`;
   }
 
   private handleSignal(env: { signal: string; data: unknown }): void {

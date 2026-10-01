@@ -96,6 +96,20 @@ describe("GiracleSocket ERROR / 再接続", () => {
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 
+  test("stop() 後は、遅れて close が来ても再接続しない", async () => {
+    const s = makeSocket({ reconnectBaseMs: 10 });
+    s.start();
+    const ws = latestMock();
+    ws.open();
+
+    s.stop();
+    ws.serverClose(); // stop 後に届き得る close
+
+    await sleep(40);
+
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
   test("異常 close → 自動再接続（小さい baseMs で実際に新接続される）", async () => {
     const s = makeSocket({ reconnectBaseMs: 10 });
     s.start();
