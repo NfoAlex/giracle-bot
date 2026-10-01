@@ -8,7 +8,8 @@ const bot = new GiracleBot({
 });
 
 bot.on("message", (msg) => {
-  if (!bot.remoteUserId || msg.userId === bot.remoteUserId || msg.isBot) return;
+  console.log("ping :: bot.on('message') : ", msg, !bot.remoteUserId, msg.userId === bot.remoteUserId, msg.isBot);
+  if (msg.userId === bot.remoteUserId || msg.isBot) return;
   if (msg.content.trim() !== "/ping") return;
 
   bot.sendMessage(msg.channelId, "pong").catch(console.error);
