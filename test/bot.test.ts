@@ -6,6 +6,8 @@ import { makeMessage, MockWebSocket, latestMock } from "./mockWebSocket";
 const SERVER = "http://localhost:3000";
 const TOKEN = "tok-1";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 let bot: GiracleBot | null = null;
 
 beforeEach(() => {
@@ -360,16 +362,74 @@ describe("GiracleBot", () => {
     expect(messages).toHaveLength(0);
   });
 
-  test("WS open で open イベント発火（再接続の度にも発火）", () => {
-    const b = newBot({ botUserId: "me" });
-    bot = b;
-    let opened = 0;
-    b.on("open", () => (opened += 1));
-    b.start();
+  describe("open イベント", () => {
+    test("WS open 前は発火せず、open 1 回につき 1 回だけ発火", () => {
+      const b = newBot({ botUserId: "me" });
+      bot = b;
+      const opened: unknown[][] = [];
+      b.on("open", (...args) => opened.push(args));
+      b.start();
 
-    latestMock().open();
-    latestMock().open();
+      expect(opened).toHaveLength(0);
 
-    expect(opened).toBe(2);
+      latestMock().open();
+
+      expect(opened).toEqual([[]]); // 引数なしで 1 回
+    });
+
+    test("start() を重ねても open は 1 回だけ（ソケットが 1 個のため）", () => {
+      const b = newBot({ botUserId: "me" });
+      bot = b;
+      let opened = 0;
+      b.on("open", () => (opened += 1));
+      b.start();
+      b.start();
+
+      latestMock().open();
+
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(opened).toBe(1);
+    });
+
+    test("再接続した新ソケットの open でも発火する（接続ごとに 1 回）", async () => {
+      const b = newBot({ botUserId: "me", reconnectBaseMs: 10 });
+      bot = b;
+      let opened = 0;
+      b.on("open", () => (opened += 1));
+      b.start();
+
+      latestMock().open();
+      expect(opened).toBe(1);
+
+      latestMock().serverClose();
+      await sleep(40);
+
+      expect(MockWebSocket.instances).toHaveLength(2);
+      latestMock().open();
+
+      expect(opened).toBe(2);
+    });
+
+    test("fatal ERROR 後の start() でも新ソケットの open が発火する", () => {
+      const b = newBot({ botUserId: "me" });
+      bot = b;
+      let opened = 0;
+      b.on("open", () => (opened += 1));
+      b.on("error", () => {});
+      b.start();
+
+      latestMock().open();
+      expect(opened).toBe(1);
+
+      latestMock().receive(
+        JSON.stringify({ signal: "ERROR", data: "unauthorized" }),
+      );
+
+      b.start(); // ERROR でソケットは破棄済み → 再起動できる
+      expect(MockWebSocket.instances).toHaveLength(2);
+      latestMock().open();
+
+      expect(opened).toBe(2);
+    });
   });
 });
