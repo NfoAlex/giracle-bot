@@ -83,6 +83,8 @@ export type BotEventMap = {
  messageUpdate: [message: Partial<Message> & { id: string }];
  /** inbox::Added */
  inbox: [inbox: InboxAdded];
+ /** WS 接続確立（初回・再接続の度に発火。送信可能の合図） */
+ open: [];
  /** HTTP エラー / WS ERROR signal / WS 異常切断など */
  error: [error: Error];
  /** stop() または ERROR signal 後の終了 */

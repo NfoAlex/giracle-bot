@@ -81,6 +81,7 @@ export class GiracleBot extends EventEmitter {
       reconnectBaseMs: this.options.reconnectBaseMs,
     });
     this.socket.onSignal = (env) => this.handleSignal(env);
+    this.socket.onOpen = () => this.emit("open");
     this.socket.onError = (err) => {
       // ERROR signal（トークン無効・未承認・canReadMessage 無し・BAN/削除）。fatal で終了する。
       // ソケットを破棄してから通知し、stop() → start() での再起動を可能にする。

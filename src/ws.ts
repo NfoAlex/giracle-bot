@@ -51,6 +51,7 @@ const DEFAULT_PING = 30_000;
 export class GiracleSocket {
   onSignal?: (env: SignalEnvelope) => void;
   onError?: (err: Error) => void;
+  onOpen?: () => void;
 
   private url: string;
   private token: string;
@@ -118,6 +119,7 @@ export class GiracleSocket {
       this.attempt = 0;
       this.lastPongAt = Date.now();
       this.startPing();
+      this.onOpen?.();
     };
     ws.onmessage = (ev) => this.handleMessage(ev.data);
     ws.onclose = (ev) => {

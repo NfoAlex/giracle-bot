@@ -359,4 +359,17 @@ describe("GiracleBot", () => {
 
     expect(messages).toHaveLength(0);
   });
+
+  test("WS open で open イベント発火（再接続の度にも発火）", () => {
+    const b = newBot({ botUserId: "me" });
+    bot = b;
+    let opened = 0;
+    b.on("open", () => (opened += 1));
+    b.start();
+
+    latestMock().open();
+    latestMock().open();
+
+    expect(opened).toBe(2);
+  });
 });
