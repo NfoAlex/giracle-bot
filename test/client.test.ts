@@ -160,6 +160,73 @@ describe("GiracleClient", () => {
     expect(apiErr.body).toBe("");
   });
 
+  test("429 レート制限 → GiracleApiError(status=429)。文言で分岐せず status をそのまま渡す", async () => {
+    const { impl } = mockFetch(() => textRes(429, "Too Many Requests"));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.sendMessage("c1", "hi").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    const apiErr = err as GiracleApiError;
+    expect(apiErr.status).toBe(429);
+    expect(apiErr.body).toBe("Too Many Requests");
+  });
+
+  test("editMessage のリクエスト形状: POST /ext/message/edit ボディ { targetMessageId, message }", async () => {
+    const { impl, calls } = mockFetch((url, init) => {
+      expect(url).toBe(`${SERVER}/ext/message/edit`);
+      expect(init?.method).toBe("POST");
+
+      return okJson(makeMessage());
+    });
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    await client.editMessage("m1", "edited");
+
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      targetMessageId: "m1",
+      message: "edited",
+    });
+    expect(calls[0]?.init?.headers).toEqual({
+      Authorization: TOKEN,
+      "content-type": "application/json",
+    });
+  });
+
+  test("deleteMessage のリクエスト形状: DELETE /ext/message/delete ボディ { targetMessageId }", async () => {
+    const { impl, calls } = mockFetch((url, init) => {
+      expect(url).toBe(`${SERVER}/ext/message/delete`);
+      expect(init?.method).toBe("DELETE");
+
+      return okJson({ id: "m1", userId: "alice", channelId: "c1" });
+    });
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    await client.deleteMessage("m1");
+
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      targetMessageId: "m1",
+    });
+    expect(calls[0]?.init?.headers).toEqual({
+      Authorization: TOKEN,
+      "content-type": "application/json",
+    });
+  });
+
+  test("serverUrl の末尾スラッシュは正規化され二重スラッシュにならない", async () => {
+    const { impl, calls } = mockFetch(() => okJson(makeMessage()));
+    const client = new GiracleClient(`${SERVER}/`, TOKEN, impl);
+
+    await client.getMessage("m1");
+
+    expect(calls[0]?.url).toBe(`${SERVER}/ext/message/m1`);
+  });
+
   test("送信系でも 2xx 非 JSON は同じフォールバックに乗る", async () => {
     const { impl } = mockFetch(() => textRes(200, "OK"));
     const client = new GiracleClient(SERVER, TOKEN, impl);

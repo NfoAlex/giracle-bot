@@ -47,6 +47,20 @@ function newBot(over: Partial<BotOptions> = {}): GiracleBot {
 }
 
 describe("GiracleBot", () => {
+  test("WS 接続先は http→ws 変換 + 末尾スラッシュ正規化で ws://…/ext/ws", () => {
+    const b = new GiracleBot({
+      serverUrl: `${SERVER}/`,
+      token: TOKEN,
+      WebSocketImpl: MockWebSocket,
+    });
+    bot = b;
+
+    b.start();
+
+    expect(latestMock().url).toBe("ws://localhost:3000/ext/ws");
+    expect(latestMock().options?.headers).toEqual({ Authorization: TOKEN });
+  });
+
   test("start 後、他ユーザーの message::SendMessage で message イベント発火", () => {
     const b = newBot({ botUserId: "me" });
     bot = b;
