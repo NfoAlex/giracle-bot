@@ -56,7 +56,7 @@ Claude Code / 同種のエージェントでは `SKILL.md` をスキルとして
 | `editMessage(targetMessageId, message)` | 編集 |
 | `deleteMessage(targetMessageId)` | 削除（自分の送信分のみ） |
 
-エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。
+エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。429 は Bot 単位レート制限（既定 200 回 / 60 秒、サーバーの `RATE_LIMIT_BOT_ENABLED` で有効化）。
 
 ## イベント
 
@@ -110,3 +110,5 @@ bun run build
 - `send` 直後に URL プレビュー生成で `messageUpdate` が飛ぶ。編集と誤認しない（`isEdited` で判別）
 - システムメッセージ（`isSystemMessage: true` / `userId: "SYSTEM"` / `content` は JSON 文字列）も `message` に流れる。応答する Bot は `msg.isSystemMessage` で弾く
 - WS の `Message` は `MessageUrlPreview` / `MessageFileAttached` を持たないことがある（HTTP の GET / send には常に付く）
+- `canReadMessage` が無い Bot は WS 接続が ERROR で拒否される（メッセージ受信 Bot は必須権限）
+- 送信しすぎるとサーバーの Bot 単位レート制限で 429 になる（既定 200 回 / 60 秒）。連投は避ける

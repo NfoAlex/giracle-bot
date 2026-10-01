@@ -45,20 +45,21 @@ Bot開発者                 Giracleサーバー
 | status | 文言 | 条件 |
 | --- | --- | --- |
 | 400 | `Message is empty` | 空白のみの本文 |
-| 400 | `Message is too long. Maximum length is <N>` | `ServerConfig.MessageMaxLength` 超過 |
+| 400 | `Message is too long. Maximum length is <N>` | `ServerConfig.MessageMaxLength` 超過（未設定時は長さチェック無し） |
 | 400 | `Replying message not found` | 返信先が同チャンネルに存在しない |
 | 400 | `Message is already same` | 編集内容が同一 |
 | 401 | `Authorization header is invalid` / `Your bot is not approved` / `This bot is disabled` | トークン不正 / 未承認 / Bot のユーザーが BAN・論理削除 |
 | 403 | `Permission not enough` | `can*` フラグ不足 |
-| 403 | `Channel not permitted` | `botChannelPermissions` に該当チャンネルが無い（非透過Bot は存在しないチャンネルもこれ） |
+| 403 | `Channel not permitted` | `send` のみ。`botChannelPermissions` に該当チャンネルが無い（非透過Bot は存在しないチャンネルもこれ）。`edit` / `delete` は存在秘匿のため 404 に伏せる |
 | 403 | `You are not sender of this message` | 他人のメッセージを編集・削除 |
-| 404 | `Message not found` | 存在しない or 許可チャンネル外 |
+| 404 | `Message not found` | 存在しない or 許可チャンネル外（GET / edit / delete） |
 | 404 | `Channel not found` | 存在しないチャンネルへの送信（全透過Bot のみ。FK 違反で 500 にしないための確認） |
+| 429 | `Too Many Requests` | Bot 単位レート制限（`RATE_LIMIT_BOT_ENABLED=true` のとき。`RATE_LIMIT_BOT_COUNT` 200 回 / `RATE_LIMIT_BOT_TIMEOUT` 60 秒の固定ウィンドウ、全 `/ext/message` 対象）。`/ext` は IP レート制限（`Middleware.RateLimiter`）の対象外 |
 
 補足:
 
 - **レスポンス形式が通常モジュールと異なる。** `/ext` は `{ message, data }` ラッパー無しで生のメッセージ行を返す。エラー時はボディがテキスト（JSON ではない）。
-- メンションは `@<userId>` 形式。Bot 送信でもチャンネル参加者にメンション通知される（サービス側で処理済みのため、フレームワーク側で通知処理は不要）。
+- メンションは `@<userId>` 形式。Bot 送信でもチャンネル参加者にメンション通知される（サービス側で処理済みのため、フレームワーク側で通知処理は不要）。返信の inbox 通知（`inbox::Added` type `reply`）は返信先の送信者がチャンネル参加者の場合のみ飛ぶ。
 - URL プレビューは `send` / `edit` の afterResponse で非同期生成され、`message::UpdateMessage` が配信される。直後の GET にはまだ反映されていないことがある。
 - `delete` は自分（`remoteUserId`）が送信したメッセージのみ削除可。関連データ（URL プレビュー・リアクション・添付ファイル・inbox）を1トランザクションで削除し、ファイル実体も消す。WS へは GLOBAL に `message::MessageDeleted`（data: `{ messageId, channelId }`）が publish されるが、**Bot は GLOBAL を購読しないためこの signal は届かない**。
 
@@ -66,7 +67,7 @@ Bot開発者                 Giracleサーバー
 
 - エンドポイント: `ws://<host>/ext/ws`、ヘッダ `Authorization: <tokenCode>`（通常ユーザーは `/ws`）。
 - 接続時、サーバーが `user::<remoteUserId>` と許可された全 `channel::<channelId>` を自動購読する。**Bot は `GLOBAL` を購読しない**（`user::Connected` / `user::Disconnected` は受け取れない）。
-- トークン不正・未承認時: `{ signal: "ERROR", data: "..." }` 受信後にサーバーから close される。文言は `Bot token not valid` / `Your bot is not approved yet` / `This bot is disabled`。接続後に承認取消・権限変更（再申請）・Bot 削除・BAN されても `ERROR`（例: `bot was deleted`）→ close される。
+- トークン不正・未承認時: `{ signal: "ERROR", data: "..." }` 受信後にサーバーから close される。文言は `Bot token not valid` / `Your bot is not approved yet` / `This bot is disabled` / `Your bot is not permitted to read messages`（`canReadMessage` 無しの Bot は WS 接続自体が拒否される）。接続後に承認取消・権限変更（再申請）・Bot 削除・BAN されても `ERROR`（例: `bot was deleted`）→ close される。
 - クライアント → サーバー: `{ signal: "ping", data: "pong" }` で `pong` が返る（これ以外の signal は無視される）。ヘッダ `Authorization` を付ける。
 - サーバー → クライアントの signal（Bot が受け取り得るもの）:
 
@@ -170,7 +171,7 @@ giracle-bot/
 ### 2.5 エラー・再接続設計
 
 - HTTP エラーは throw。WS 切断（close 以外の 1006 等）は `close` イベント → 1 秒から始まる指数バックオフ（上限 60 秒）で再接続。
-- `ERROR` signal 受信（トークン無効・未承認）は再接続しても同じ結果のため、`error` イベント発火のみで再接続しない。
+- `ERROR` signal 受信（トークン無効・未承認・`canReadMessage` 無し・BAN/削除）は再接続しても同じ結果のため、`error` イベント発火のみで再接続しない。
 - 再接続後は自動で購読が復元される（購読はサーバー側 open ハンドラで行われるため、クライアント側の購読リスト管理は不要）。
 
 ### 2.6 実装手順

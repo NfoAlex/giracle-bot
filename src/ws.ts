@@ -159,7 +159,7 @@ export class GiracleSocket {
     }
 
     if (env.signal === "ERROR") {
-      // トークン無効・未承認。再接続しても同じ結果なので fatal 扱いで止める。
+      // トークン無効・未承認・canReadMessage 無し・BAN/削除。再接続しても同じ結果なので fatal 扱いで止める。
       log(`ERROR signal を受信: ${String(env.data)} → 再接続しない`);
 
       this.fatalError = true;

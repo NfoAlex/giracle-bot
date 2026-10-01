@@ -86,14 +86,14 @@ function report(err: unknown) {
 
 1. **自己送信ガードは必須。** `message::SendMessage` は Bot 自身の HTTP 送信でも配信される。フレームワークは送信中の echo を `remoteUserId` 確定まで保留して判定するが、`botUserId` 未指定なら初回 `sendMessage` 確定前に届いた自分の投稿は素通しする。echo 型 Bot は `botUserId` を必ず設定し、さらに `if (!bot.remoteUserId) return;` を先頭に置く。
 2. **`messageUpdate` を編集と決め打ちしない。** `send`/`edit` 直後の URL プレビュー生成でも飛ぶ。`update.isEdited` を見る。また差分ペイロードは部分行（編集は `{id, channelId, content, isEdited, userId}`、URL プレビューは `MessageFileAttached` 等が欠ける）→ 完全な `Message` が要るなら `await bot.getMessage(update.id)` で取り直す。
-3. **エラー分岐は `err.status` のみ。** `err.body` の文言はサーバー実装依存。401 = token 不正 or 未承認、403 = `can*` 権限不足 / チャンネル未許可 / 他人のメッセージ、404 = 存在しない or 許可外、400 = 空・長すぎ・返信先なし・同内容編集。文言で `if (body.includes(...))` を書かない。
+3. **エラー分岐は `err.status` のみ。** `err.body` の文言はサーバー実装依存。401 = token 不正 or 未承認 or Bot 無効化、403 = `can*` 権限不足 / 他人のメッセージ、404 = 存在しない・許可外（edit / delete のチャンネル未許可も 404 に伏せられる）、400 = 空・長すぎ・返信先なし・同内容編集、429 = Bot 単位レート制限（時間をおいて再送）。文言で `if (body.includes(...))` を書かない。
 4. **削除前に所有者確認。** `deleteMessage` は自分の送信分しか消せない（他人のは 403）。`example/delete-bot.ts` のように `getMessage` して `userId === bot.remoteUserId` を確認してから消す。
-5. **`ERROR` signal は fatal。** 再接続しない（`error` → `close`）。401 が続く場合は token か承認状態を疑い、コードではなく運用（管理者への確認）を促す。
+5. **`ERROR` signal は fatal。** 再接続しない（`error` → `close`）。原因はトークン無効・未承認・`canReadMessage` 無し・BAN/削除など。401 が続く場合は token か承認状態を疑い、コードではなく運用（管理者への確認）を促す。
 6. **HTTP 例外は投げっぱなし。** `sendMessage` 等は reject する。`await ... .catch(report)` か `try/catch` を必ず付ける。素の `void bot.sendMessage(...)` は unhandled rejection になる。
 7. **送信前バリデーション。** 空白のみ / 長すぎはサーバーが 400 を返す。ユーザー入力をそのまま送らず `trim()` し、`startsWith("!cmd")` 系は空ボディを弾く。
 8. **メンションは `@<userId>` 文字列。** 通知はサーバー側処理済み。`replaceAll(\`@${bot.remoteUserId}\`, "")` で本文を抽出（`example/reply-bot.ts`）。
 9. **Bun 専用・依存ゼロ。** `fetch` / `WebSocket` はネイティブ。npm パッケージを足さない。Node API 前提のライブラリ（`ws`, `node-fetch` 等）も不要。
-10. **SQLite 書き込み競合。** 連投・全チャンネル一斉送信は避ける。必要なら Bot 側で送信間隔を空ける（フレームワークに連投抑制は無い）。
+10. **SQLite 書き込み競合。** 連投・全チャンネル一斉送信は避ける。必要なら Bot 側で送信間隔を空ける（フレームワークに連投抑制は無い。サーバー側の Bot 単位レート制限（既定 200 回 / 60 秒）を超えると 429 になる）。
 11. **システムメッセージを応答対象にしない。** `isSystemMessage: true`（`userId: "SYSTEM"`、`content` は JSON 文字列）が `message` に流れる。`if (msg.isSystemMessage) return;` をガードに足す。
 
 ## 4. 実装パターン
