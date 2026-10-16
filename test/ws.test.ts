@@ -125,6 +125,19 @@ describe("GiracleSocket ERROR / 再接続", () => {
     expect(MockWebSocket.instances).toHaveLength(2); // 再接続された
   });
 
+  test("reconnectBaseMs: 0 は既定値扱いになり、接続断後も再接続 hot-loop しない", async () => {
+    const s = makeSocket({ reconnectBaseMs: 0 });
+    s.start();
+    const ws = latestMock();
+    ws.open();
+    ws.serverClose();
+
+    // 0 が素通りすると遅延 0 で即再接続されるが、clamp（既定 1s）なら 50ms 内に新接続は無い
+    await sleep(50);
+
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
   test("正常な OPEN 後にバックオフ遅延はリセットされる（attempt が進んでも開通で 0 に）", async () => {
     const s = makeSocket({ reconnectBaseMs: 10 });
     s.start();

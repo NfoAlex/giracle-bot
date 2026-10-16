@@ -117,6 +117,31 @@ describe("GiracleBot", () => {
     expect(updates).toHaveLength(1);
   });
 
+  test("isEdited が真偽値でない部分行（id あり）は捨てられる", () => {
+    const b = newBot();
+    bot = b;
+    const got: unknown[] = [];
+    b.on("message", (m) => got.push(m));
+    b.on("messageUpdate", (u) => got.push(u));
+    b.start();
+
+    // 文字列 / 数値の isEdited は部分行と認めない（壊れた payload を誤流用しない）
+    latestMock().receive(
+      JSON.stringify({
+        signal: "message::UpdateMessage",
+        data: { id: "m5", channelId: "c1", userId: "u1", content: "x", isEdited: "true" },
+      }),
+    );
+    latestMock().receive(
+      JSON.stringify({
+        signal: "message::UpdateMessage",
+        data: { id: "m6", channelId: "c1", userId: "u1", content: "x", isEdited: 1 },
+      }),
+    );
+
+    expect(got).toHaveLength(0);
+  });
+
   test("inbox::Added のマッピング（メンション）", () => {
     const b = newBot();
     bot = b;
