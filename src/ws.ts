@@ -219,7 +219,8 @@ export class GiracleSocket {
         return;
       }
 
-      this.ws.send(JSON.stringify({ signal: "ping", data: "pong" }));
+      // body は { signal, data } とも非空文字列が必須。data は任意の非空文字列でよい
+      this.ws.send(JSON.stringify({ signal: "ping", data: "ping" }));
     }, interval);
   }
 
