@@ -66,10 +66,10 @@ Bot 用 HTTP API はこの 1 つのみ。**`getMessage` / `editMessage` / `delet
 | `message` | `Message` | 新規メッセージ（signal は `message::UpdateMessage`。全行分が流れる）。システムメッセージも流れる。**Bot 自身の送信は WS 配信されない**ため自己送信ガードは不要 |
 | `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み |
 | `inbox` | `InboxAdded` | Bot がメンション・返信されたとき（`{ message, type: "mention" \| "reply" }`）。メンションはチャンネル参加者が送った場合のみ |
-| `error` | `Error` | HTTP/WS エラー。`ERROR` signal（トークン無効・未承認・無効化）受信時は**再接続しない**。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
+| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
 | `close` | なし | `stop()` または fatal エラーによる終了 |
 
-WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。ping は 30 秒間隔で自動送信し、`pong` が 2 周期（`pingIntervalMs × 2`）返らなければ半死接続とみなして切断 → 再接続する。
+WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。ping は 30 秒間隔で自動送信し、`pong` が 2 周期連続で返らなければ（最終受信から `pingIntervalMs × 2` を超えた次の周期で）半死接続とみなして切断 → 再接続する。
 
 ## ログ
 

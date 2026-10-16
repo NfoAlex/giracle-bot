@@ -224,6 +224,19 @@ describe("GiracleBot", () => {
     expect(closed).toBe(1);
   });
 
+  test("異常切断では error を発火しない（自動再接続のみ）", () => {
+    const b = newBot();
+    bot = b;
+    const errs: Error[] = [];
+    b.on("error", (e) => errs.push(e));
+    b.start();
+
+    latestMock().open();
+    latestMock().serverClose();
+
+    expect(errs).toHaveLength(0);
+  });
+
   test("start() を 2 回呼んでもソケットは 1 個だけ", () => {
     const b = newBot();
     bot = b;

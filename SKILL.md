@@ -40,7 +40,7 @@ Bot 用 HTTP API は **send の 1 つのみ**。編集・削除・取得は `/ex
 | `message` | `Message` | 新規投稿（signal 名は `message::UpdateMessage`）。**Bot 自身の送信は配信されない**ため自己送信ガード不要。システムメッセージも含む |
 | `messageUpdate` | `MessageUpdate` | 編集のみ。`{ id, channelId, userId, content, isEdited: true }` の部分行 |
 | `inbox` | `{ message, type }` | Bot ユーザーがメンション（type `mention`）・返信（type `reply`）されたとき |
-| `error` | `Error` | HTTP 失敗 / WS `ERROR` signal / 異常切断 |
+| `error` | `Error` | WS `ERROR` signal の受信時のみ（fatal。`close` も続けて発火）。HTTP 失敗は `sendMessage` の reject なので catch する |
 | `close` | なし | `stop()` または `ERROR` signal 後 |
 
 無い機能: メッセージ編集・削除（Bot API に無い）、リアクション、タイピング、削除の受信（Bot は `GLOBAL` を購読しないため `message::MessageDeleted` は届かない）、URL プレビューの更新配信。必要になったら「フレームワークのスコープ外」と報告する。
