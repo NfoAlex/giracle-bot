@@ -111,10 +111,10 @@ import { GiracleBot } from "../src";
 import { MockWebSocket, makeMessage } from "../test/mockWebSocket";
 
 const fetchImpl = (async (_input: unknown) =>
-  new Response(JSON.stringify({ message: "Sent message", data: makeMessage() }), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  })) as typeof fetch;
+  new Response(
+    JSON.stringify({ message: "Sent message", data: { messageSaved: makeMessage(), messageReplyingTo: null } }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  )) as typeof fetch;
 
 const bot = new GiracleBot({ serverUrl: "http://x", token: "t", fetchImpl, WebSocketImpl: MockWebSocket });
 bot.start();
