@@ -43,11 +43,11 @@ describe("GiracleSocket 正規化", () => {
     s.start();
 
     latestMock().receive(
-      JSON.stringify({ signal: "message::SendMessage", data: { id: "m1" } }),
+      JSON.stringify({ signal: "message::UpdateMessage", data: { id: "m1" } }),
     );
 
     expect(got).toEqual([
-      { signal: "message::SendMessage", data: { id: "m1" } },
+      { signal: "message::UpdateMessage", data: { id: "m1" } },
     ]);
   });
 
@@ -181,7 +181,7 @@ describe("GiracleSocket ERROR / 再接続", () => {
 });
 
 describe("GiracleSocket ping", () => {
-  test("open 後 pingIntervalMs 間隔で {signal:ping,data:pong} を送信", async () => {
+  test("open 後 pingIntervalMs 間隔で {signal:ping,data:ping} を送信", async () => {
     const s = makeSocket({ pingIntervalMs: 15 });
     s.start();
     const ws = latestMock();
