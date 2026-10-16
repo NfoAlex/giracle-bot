@@ -5,10 +5,9 @@ import { GiracleSocket } from "./ws";
 import type {
   BotEventMap,
   BotOptions,
-  DeleteResult,
-  EditResult,
   InboxAdded,
   Message,
+  MessageUpdate,
 } from "./types";
 
 /** 文字列フィールドの型ガード（例: hasStr(data, "id")）。フレームワークが使う列だけ検証する */
@@ -21,24 +20,32 @@ function hasStr(data: unknown, key: string): data is Record<string, unknown> {
 }
 
 /**
+ * message::UpdateMessage のペイロードが新規メッセージ（全行分）かどうか。
+ * 新規メッセージと編集が同一 signal で配信されるため、部分行が持たない
+ * createdAt の有無で振り分ける。
+ */
+function isFullRow(data: unknown): data is Record<string, unknown> {
+  return (
+    hasStr(data, "id") &&
+    hasStr(data, "channelId") &&
+    hasStr(data, "userId") &&
+    hasStr(data, "createdAt")
+  );
+}
+
+/**
  * Bot の本体。HTTP クライアント + WS 接続 + イベント発火を束ねる。
- * remoteUserId が既知（botUserId 設定 or 初回 sendMessage キャッシュ）のときは
- * 自己送信の message イベントを emit しない（BOT_FRAMEWORK.md 2.2-4）。
+ * Bot 自身の HTTP 送信は WS 配信されないため自己送信フィルタは不要。
  */
 export class GiracleBot extends EventEmitter {
   private options: BotOptions;
   private client: GiracleClient;
   private socket: GiracleSocket | null = null;
   private closed = false;
-  private cachedUserId: string | undefined;
-  /** identity 未確定時の echo race 回避: 送信中の message signal を一時保留 */
-  private held: Message[] = [];
-  private sending = 0;
 
   constructor(options: BotOptions) {
     super();
     this.options = options;
-    this.cachedUserId = options.botUserId;
     this.client = new GiracleClient(
       options.serverUrl,
       options.token,
@@ -58,11 +65,6 @@ export class GiracleBot extends EventEmitter {
     ...args: BotEventMap[K]
   ): boolean {
     return super.emit(event as string, ...args);
-  }
-
-  /** Bot の remoteUserId。明示設定が無ければ最初の sendMessage 成功時にキャッシュ */
-  get remoteUserId(): string | undefined {
-    return this.cachedUserId;
   }
 
   /** WS へ接続開始。既に接続中なら何もしない（孤児ソケットを作らない） */
@@ -87,12 +89,13 @@ export class GiracleBot extends EventEmitter {
     this.socket.onSignal = (env) => this.handleSignal(env);
     this.socket.onOpen = () => this.emit("open");
     this.socket.onError = (err) => {
-      // ERROR signal（トークン無効・未承認・canReadMessage 無し・BAN/削除）。fatal で終了する。
-      // ソケットを破棄してから通知し、stop() → start() での再起動を可能にする。
+      // ERROR signal（トークン無効・未承認・BAN/削除）。fatal で終了する。
+      // ソケットを破棄し、close → error の順に通知する（close を先に確定させないと、
+      // error ハンドラの start() が closed を再武装して以降 close が出なくなる）。
       this.socket?.stop();
       this.socket = null;
-      this.emitError(err);
       this.emitClose();
+      this.emitError(err);
     };
     this.closed = false;
     this.socket.start();
@@ -131,105 +134,57 @@ export class GiracleBot extends EventEmitter {
     console.error("giracle-bot: unhandled error:", err);
   }
 
-  /** GET /ext/message/:messageId */
-  getMessage(messageId: string): Promise<Message> {
-    return this.client.getMessage(messageId);
-  }
-
-  /** POST /ext/message/send。成功時はレスポンスの userId を remoteUserId としてキャッシュ */
-  async sendMessage(
+  /** POST /ext/message/send。チャンネルへ参加済みである必要がある */
+  sendMessage(
     channelId: string,
     message: string,
     replyingMessageId?: string,
   ): Promise<Message> {
-    this.sending += 1;
-
-    try {
-      const res = await this.client.sendMessage(
-        channelId,
-        message,
-        replyingMessageId,
-      );
-
-      this.cachedUserId ??= res.userId;
-
-      return res;
-    } finally {
-      this.sending -= 1;
-      this.flushHeld();
-    }
-  }
-
-  /** POST /ext/message/edit */
-  editMessage(targetMessageId: string, message: string): Promise<EditResult> {
-    return this.client.editMessage(targetMessageId, message);
-  }
-
-  /** DELETE /ext/message/delete。自分の送信メッセージのみ削除可 */
-  deleteMessage(targetMessageId: string): Promise<DeleteResult> {
-    return this.client.deleteMessage(targetMessageId);
+    return this.client.sendMessage(channelId, message, replyingMessageId);
   }
 
   private handleSignal(env: { signal: string; data: unknown }): void {
     switch (env.signal) {
-      case "message::SendMessage": {
-        // フレームワークが使うフィールドのみ検証する。不正 payload は黙って捨てる。
-        if (!hasStr(env.data, "id") || !hasStr(env.data, "userId")) return;
-
-        // SAFETY: 直上で id / userId を検証済み。他フィールドは利用側の責務。
-        this.dispatchMessage(env.data as Message);
-
-        return;
-      }
       case "message::UpdateMessage": {
-        // フレームワークが使うフィールドのみ検証する。不正 payload は黙って捨てる。
-        if (!hasStr(env.data, "id")) return;
+        // 新規メッセージ（全行分）と編集（部分行）が同一 signal で来るため振り分ける。
+        // フレームワークが使うフィールドのみ検証し、不正 payload は黙って捨てる。
+        if (isFullRow(env.data)) {
+          // SAFETY: 直上で必須フィールドを検証済み。他フィールドは利用側の責務。
+          this.emit("message", env.data as unknown as Message);
 
-        // SAFETY: 直上で id を検証済み。他フィールドは利用側の責務。
-        this.emit(
-          "messageUpdate",
-          env.data as Partial<Message> & { id: string },
-        );
+          return;
+        }
+        const isBoolEdited =
+          typeof env.data === "object" &&
+          env.data !== null &&
+          typeof (env.data as { isEdited?: unknown }).isEdited === "boolean";
+        if (hasStr(env.data, "id") && isBoolEdited) {
+          // SAFETY: 直上で id を検証済み。他フィールドは利用側の責務。
+          this.emit("messageUpdate", env.data as unknown as MessageUpdate);
+
+          return;
+        }
 
         return;
       }
-      case "inbox::Added":
-        this.emit("inbox", env.data as InboxAdded);
+      case "inbox::Added": {
+        // メンション通知。message が行っぽければ流す。
+        if (
+          typeof env.data === "object" &&
+          env.data !== null &&
+          hasStr(
+            (env.data as { message?: unknown }).message,
+            "id",
+          )
+        ) {
+          this.emit("inbox", env.data as InboxAdded);
+        }
 
         return;
+      }
       default:
         // "pong" / "raw" / 未知 signal は無視
         return;
     }
-  }
-
-  /**
-   * message の判定。自己送信はフィルタ（echo 無限ループ防止）。
-   * 自己 echo は HTTP レスポンスより先に届き得るため、identity 未確定かつ
-   * 送信中は保留し、送信完了で identity が判明してから判定する。
-   * 例: 初回 sendMessage 中に届いた自分の echo を誤って emit しない。
-   */
-  private dispatchMessage(msg: Message): void {
-    if (this.cachedUserId === undefined && this.sending > 0) {
-      this.held.push(msg);
-
-      return;
-    }
-
-    if (this.remoteUserId !== undefined && msg.userId === this.remoteUserId) {
-      return;
-    }
-
-    this.emit("message", msg);
-  }
-
-  /** 保留中の message を再判定して放出（他人の分は取りこぼさない） */
-  private flushHeld(): void {
-    if (this.sending > 0 || this.held.length === 0) return;
-
-    const held = this.held;
-    this.held = [];
-
-    for (const msg of held) this.dispatchMessage(msg);
   }
 }

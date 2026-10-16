@@ -1,17 +1,17 @@
 import { GiracleBot } from "../src/index";
 
-// 実行: BOT_TOKEN=... BOT_USER_ID=... bun run example/echo.ts
+// 実行: BOT_TOKEN=... bun run example/echo.ts
+// Bot 自身の HTTP 送信は WS 配信されないため、自己送信ガードは不要。
 const bot = new GiracleBot({
   serverUrl: process.env.SERVER_URL ?? "http://localhost:3000",
   token: process.env.BOT_TOKEN ?? "",
-  botUserId: process.env.BOT_USER_ID, // 省略時は初回 sendMessage から自動キャッシュ
 });
 
 bot.on("message", (msg) => {
-  // 自己送信は無視（echo の無限ループ防止）
-  if (msg.userId === bot.remoteUserId) return;
+  // システムメッセージ（入退室等）には応答しない
+  if (msg.isSystemMessage) return;
 
-  bot.sendMessage(msg.channelId, `echo: ${msg.content}`);
+  bot.sendMessage(msg.channelId, `echo: ${msg.content}`).catch(console.error);
 });
 
 bot.on("error", (err) => {

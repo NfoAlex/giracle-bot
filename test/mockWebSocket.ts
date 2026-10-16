@@ -64,11 +64,35 @@ export function makeMessage(over: Partial<Message> = {}): Message {
     content: "hello",
     isSystemMessage: false,
     replyingMessageId: null,
-    isBot: false,
     isEdited: false,
     createdAt: "2024-01-01T00:00:00.000Z",
-    MessageUrlPreview: [],
     MessageFileAttached: [],
+    ...over,
+  };
+}
+
+/** 編集配信の部分行ペイロード（updateMessage の returning 相当） */
+export function makeUpdate(
+  over: Partial<{
+    id: string;
+    channelId: string;
+    userId: string;
+    content: string;
+    isEdited: boolean;
+  }> = {},
+): {
+  id: string;
+  channelId: string;
+  userId: string;
+  content: string;
+  isEdited: boolean;
+} {
+  return {
+    id: "m1",
+    channelId: "c1",
+    userId: "u1",
+    content: "edited",
+    isEdited: true,
     ...over,
   };
 }

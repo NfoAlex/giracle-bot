@@ -43,11 +43,11 @@ describe("GiracleSocket 正規化", () => {
     s.start();
 
     latestMock().receive(
-      JSON.stringify({ signal: "message::SendMessage", data: { id: "m1" } }),
+      JSON.stringify({ signal: "message::UpdateMessage", data: { id: "m1" } }),
     );
 
     expect(got).toEqual([
-      { signal: "message::SendMessage", data: { id: "m1" } },
+      { signal: "message::UpdateMessage", data: { id: "m1" } },
     ]);
   });
 
@@ -125,6 +125,19 @@ describe("GiracleSocket ERROR / 再接続", () => {
     expect(MockWebSocket.instances).toHaveLength(2); // 再接続された
   });
 
+  test("reconnectBaseMs: 0 は既定値扱いになり、接続断後も再接続 hot-loop しない", async () => {
+    const s = makeSocket({ reconnectBaseMs: 0 });
+    s.start();
+    const ws = latestMock();
+    ws.open();
+    ws.serverClose();
+
+    // 0 が素通りすると遅延 0 で即再接続されるが、clamp（既定 1s）なら 50ms 内に新接続は無い
+    await sleep(50);
+
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
   test("正常な OPEN 後にバックオフ遅延はリセットされる（attempt が進んでも開通で 0 に）", async () => {
     const s = makeSocket({ reconnectBaseMs: 10 });
     s.start();
@@ -168,7 +181,7 @@ describe("GiracleSocket ERROR / 再接続", () => {
 });
 
 describe("GiracleSocket ping", () => {
-  test("open 後 pingIntervalMs 間隔で {signal:ping,data:pong} を送信", async () => {
+  test("open 後 pingIntervalMs 間隔で {signal:ping,data:ping} を送信", async () => {
     const s = makeSocket({ pingIntervalMs: 15 });
     s.start();
     const ws = latestMock();
@@ -183,10 +196,23 @@ describe("GiracleSocket ping", () => {
     }
 
     const pings = ws.sent.filter(
-      (m) => m === JSON.stringify({ signal: "ping", data: "pong" }),
+      (m) => m === JSON.stringify({ signal: "ping", data: "ping" }),
     );
 
     expect(pings.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("pingIntervalMs: 0 は既定値扱いになり、即切断ループにならない", async () => {
+    const s = makeSocket({ pingIntervalMs: 0, reconnectBaseMs: 0 });
+    s.start();
+    const ws = latestMock();
+    ws.open();
+
+    // 0 が素通りすると liveness 閾値 0 のため open 直後に close される。既定値（30s）なら切断しない
+    await sleep(50);
+
+    expect(ws.closed).toBe(false);
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 
   test("pong 無応答 → 半死接続とみなし close して再接続する", async () => {

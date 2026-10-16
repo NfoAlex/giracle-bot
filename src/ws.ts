@@ -152,7 +152,7 @@ export class GiracleSocket {
     }
 
     if (env.signal === "ERROR") {
-      // トークン無効・未承認・canReadMessage 無し・BAN/削除。再接続しても同じ結果なので fatal 扱いで止める。
+      // トークン無効・未承認・BAN/削除。再接続しても同じ結果なので fatal 扱いで止める。
       log(`ERROR signal を受信: ${String(env.data)} → 再接続しない`);
 
       this.noReconnect = true;
@@ -188,7 +188,11 @@ export class GiracleSocket {
   }
 
   private scheduleReconnect(): void {
-    const base = this.opts.reconnectBaseMs ?? DEFAULT_BASE;
+    // 0 以下だと遅延 0 の再接続ホットループになるため既定値に落とす
+    const base =
+      this.opts.reconnectBaseMs && this.opts.reconnectBaseMs > 0
+        ? this.opts.reconnectBaseMs
+        : DEFAULT_BASE;
     const delay = nextBackoffMs(this.attempt, base, DEFAULT_MAX);
 
     log(`再接続を予約: ${delay}ms 後 (attempt ${this.attempt + 1})`);
@@ -203,7 +207,11 @@ export class GiracleSocket {
 
   private startPing(): void {
     this.clearPing();
-    const interval = this.opts.pingIntervalMs ?? DEFAULT_PING;
+    // typeof ガードのみの緩い設定値。0 以下は liveness 閾値(2 周期)を常時 true 化するため既定値に落とす
+    const interval =
+      this.opts.pingIntervalMs && this.opts.pingIntervalMs > 0
+        ? this.opts.pingIntervalMs
+        : DEFAULT_PING;
 
     this.pingTimer = setInterval(() => {
       if (!this.ws || this.ws.readyState !== WS_OPEN) return;
@@ -219,7 +227,8 @@ export class GiracleSocket {
         return;
       }
 
-      this.ws.send(JSON.stringify({ signal: "ping", data: "pong" }));
+      // body は { signal, data } とも非空文字列が必須。data は任意の非空文字列でよい
+      this.ws.send(JSON.stringify({ signal: "ping", data: "ping" }));
     }, interval);
   }
 
