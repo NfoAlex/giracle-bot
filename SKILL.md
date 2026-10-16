@@ -87,6 +87,7 @@ function report(err: unknown) {
 9. **SQLite 書き込み競合。** 連投・全チャンネル一斉送信は避ける。必要なら Bot 側で送信間隔を空ける。
 10. **システムメッセージを応答対象にしない。** `isSystemMessage: true`（`content` は JSON 文字列）が `message` に流れる。`if (msg.isSystemMessage) return;` をガードに足す。
 11. **Bot 送信は他 Bot / 自分へ配信されない。** `/ext` の送信は WS へ publish しないため、Bot 同士・自分自身の echo ループは起きない。その代わり自分の投稿を `message` イベントからは追えない。
+12. **不正 payload は無言で破棄される。** `message::UpdateMessage` は全行分（`createdAt` あり）と部分行（`id` + `isEdited` が boolean）だけをイベント化し、他は log も出さず捨てる。イベントが突然来なくなったら接続ログを見たうえでバックエンドの payload 形状（`createdAt` / `isEdited`）を疑う。
 
 ## 4. 実装パターン
 
