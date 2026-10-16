@@ -1,17 +1,20 @@
-# giracle-bot
+# Giracle Bot フレームワーク
 
 Giracle サーバー向け Bot フレームワーク（Bun ランタイム用、依存ゼロ）。
 
 ```text
-Bot (Bun) ──HTTP──→ /ext/message/...   Authorization: <tokenCode>
-          ←─WS──── /ext/ws             signal: message::SendMessage 等
+Bot (Bun) ──HTTP──→ POST /ext/message/send   Authorization: <tokenCode>
+          ←─WS──── /ext/ws                   signal: message::UpdateMessage 等
 ```
 
 ## セットアップ
 
 1. Bun をインストール（`https://bun.sh`）
 2. `bun install`
-3. Bot の登録は管理者経由のみ: 管理者に `BotManage` 行を作成してもらい、`tokenCode`（UUID）と `remoteUserId` を受け取る。`approveStatus` が `APPROVED` になるまで接続は 401 になる。チャンネルごとの許可（`botChannelPermissions`）も管理者に依頼すること。
+3. Bot の登録は管理者経由のみ: 管理者が `PUT /bot` で Bot を作成し、`tokenCode`（32バイトhex）を受け取る。`isApproved` が `true` になるまで接続は 401 になる。
+   - サーバー設定 `BotEnabled` が ON である必要がある
+   - **メッセージ送信には Bot ユーザーのチャンネル参加が必要**（通常ユーザーと同じ `ChannelJoin`）。作成者が Bot ユーザーをチャンネルへ参加させておくこと
+   - WS でのメッセージ受信範囲は Bot ユーザーが**閲覧できる**チャンネル（ロールの可視設定に依存）。参加していなくても閲覧可なら **`message` イベントに流れるが送信は 400 になる**ので注意
 
 ## 使い方
 
@@ -21,15 +24,16 @@ import { GiracleBot } from "giracle-bot";
 const bot = new GiracleBot({
   serverUrl: "http://localhost:3000",
   token: process.env.BOT_TOKEN!, // BotManage.tokenCode
-  botUserId: process.env.BOT_USER_ID, // 省略可。初回 sendMessage 成功時に自動キャッシュ
 });
 
 bot.on("message", (msg) => {
-  // remoteUserId 確定後は自己送信がフレームワーク側でフィルタされる（送信中の echo は
-  // 確定まで保留）。botUserId 未設定時の確定前は流れるので、ガードしておくのが安全
-  if (msg.userId === bot.remoteUserId) return;
+  if (msg.isSystemMessage) return; // 入退室等のシステムメッセージは弾く
+  bot.sendMessage(msg.channelId, `echo: ${msg.content}`).catch(console.error);
+});
 
-  bot.sendMessage(msg.channelId, `echo: ${msg.content}`);
+bot.on("inbox", (item) => {
+  // メンション（@<botUserId>）されたとき届く
+  console.log("called:", item.message.content, item.type);
 });
 
 bot.start();
@@ -39,33 +43,30 @@ bot.start();
 
 ## Bot を作る（コーディングエージェント向け）
 
-`SKILL.md` はこのフレームワークで Bot を実装するためのエージェント向け手順書。新しい Bot の作成・コマンド/返信/編集監視/削除の実装・イベントハンドラ追加を依頼する際は、これを読ませると API 表面・落とし穴（自己送信ガード、`messageUpdate` と編集の混同、`err.status` 分岐など）・モックでの検証手順がそのまま使える。
+`SKILL.md` はこのフレームワークで Bot を実装するためのエージェント向け手順書。新しい Bot の作成・コマンド/返信/編集監視の実装・イベントハンドラ追加を依頼する際は、これを読ませると API 表面・落とし穴・モックでの検証手順がそのまま使える。
 
-```text
-SKILL.md を読んで、<やりたいこと> をする Bot を example/ に作って
-```
-
-Claude Code / 同種のエージェントでは `SKILL.md` をスキルとして参照させても良い（`name: giracle-bot`）。動く雛形は `example/`（`echo` / `reply-bot` / `edit-watcher` / `delete-bot`）にある。
+動く雛形は `example/`（`echo` / `reply-bot` / `edit-watcher` / `ping`）。
 
 ## API
 
 | メソッド | 説明 |
 | --- | --- |
-| `getMessage(messageId)` | メッセージ 1 件取得 |
-| `sendMessage(channelId, message, replyingMessageId?)` | 送信 |
-| `editMessage(targetMessageId, message)` | 編集 |
-| `deleteMessage(targetMessageId)` | 削除（自分の送信分のみ） |
+| `sendMessage(channelId, message, replyingMessageId?)` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの `data.messageSaved` をほどいて Message を返す |
 
-エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。429 は Bot 単位レート制限（既定 200 回 / 60 秒、サーバーの `RATE_LIMIT_BOT_ENABLED` で有効化）。
+Bot 用 HTTP API はこの 1 つのみ。**`getMessage` / `editMessage` / `deleteMessage` はサーバー側 `/ext` には存在しない**（通常ユーザー用の `/message` API は別に存在するが Bot は Cookie では使えない）。
+
+メンションは本文に `@<userId>` を書くとサーバー側で処理される（Bot 送信からは通知されない。ユーザー送信時のみ）。
+
+エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。err ステータス: 400 `Bot is not enabled on this server` / `Message is empty` / `Message is too long. Maximum length is <N>` / `You are not joined this channel` / `Replying message not found`、401 `Invalid token` / `Bot is not approved yet` / `This bot is disabled`。
 
 ## イベント
 
 | イベント | ペイロード | 説明 |
 | --- | --- | --- |
-| `message` | `Message` | 新規メッセージ（自己送信は `remoteUserId` 確定後にフィルタ。確定前かつ送信中は保留してから判定）。システムメッセージも流れる（注意事項参照） |
-| `messageUpdate` | `Message` 差分 | 編集 / URL プレビュー生成後の更新。`isEdited` で判別 |
-| `inbox` | `InboxAdded` | inbox::Added |
-| `error` | `Error` | HTTP/WS エラー。`ERROR` signal（トークン無効・未承認）受信時は**再接続しない**。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
+| `message` | `Message` | 新規メッセージ（signal は `message::UpdateMessage`。全行分が流れる）。システムメッセージも流れる。**Bot 自身の送信は WS 配信されない**ため自己送信ガードは不要 |
+| `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み |
+| `inbox` | `InboxAdded` | Bot がメンション・返信されたとき（`{ message, type: "mention" \| "reply" }`）。メンションはチャンネル参加者が送った場合のみ |
+| `error` | `Error` | HTTP/WS エラー。`ERROR` signal（トークン無効・未承認・無効化）受信時は**再接続しない**。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
 | `close` | なし | `stop()` または fatal エラーによる終了 |
 
 WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。ping は 30 秒間隔で自動送信し、`pong` が 2 周期（`pingIntervalMs × 2`）返らなければ半死接続とみなして切断 → 再接続する。
@@ -80,12 +81,9 @@ WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で�
 [giracle-bot] 接続確立
 [giracle-bot] 切断を検知 (code 1006 abnormal closure)
 [giracle-bot] 再接続を予約: 1000ms 後 (attempt 1)
-[giracle-bot] 再接続を試行 (attempt 1): ws://localhost:3000/ext/ws
 [giracle-bot] 再接続に成功 (attempt 1)
-[giracle-bot] pong 無応答 (最終受信から 61000ms) → 切断して再接続
-[giracle-bot] ERROR signal を受信: Your bot is not approved → 再接続しない
+[giracle-bot] ERROR signal を受信: Bot token not valid → 再接続しない
 [giracle-bot] bot を停止
-[giracle-bot] 切断を検知 (停止済みのため再接続しない)
 ```
 
 ## 配布（バンドル）
@@ -106,9 +104,10 @@ bun run build
 
 ## 注意事項
 
-- echo ボットは必ず自己送信ガードを入れる（上記サンプル参照）
-- `send` 直後に URL プレビュー生成で `messageUpdate` が飛ぶ。編集と誤認しない（`isEdited` で判別）
-- システムメッセージ（`isSystemMessage: true` / `userId: "SYSTEM"` / `content` は JSON 文字列）も `message` に流れる。応答する Bot は `msg.isSystemMessage` で弾く
-- WS の `Message` は `MessageUrlPreview` / `MessageFileAttached` を持たないことがある（HTTP の GET / send には常に付く）
-- `canReadMessage` が無い Bot は WS 接続が ERROR で拒否される（メッセージ受信 Bot は必須権限）
-- 送信しすぎるとサーバーの Bot 単位レート制限で 429 になる（既定 200 回 / 60 秒）。連投は避ける
+- **Bot 自身の送信は WS に流れない**。echo でもループにはならないが、Bot は「自分が投稿したメッセージ」を `message` イベントからは知り得ない（sendMessage の戻り値で確認する）
+- ユーザー送信時、サーバーは bot 購読トピックへ **`message::UpdateMessage`** を発行する。そのため新規メッセージも「Update」という signal 名で届く（フレームワークで振り分け済み）
+- URL プレビュー生成後の更新は `bot::channel` トピックへ配信されない
+- メッセージ削除（`message::MessageDeleted`）は GLOBAL トピックのみのため、Bot には届かない
+- システムメッセージ（`isSystemMessage: true` / `content` は JSON 文字列）も `message` に流れる。応答する Bot は `msg.isSystemMessage` で弾く
+- WS 受信可能チャンネル = 閲覧可能チャンネル、送信可能チャンネル = 参加チャンネル。参加未満のチャンネルには `message` は流れても送信は 400
+- SQLite 書き込み競合があるため連投は避ける。サーバー全体のレート制限が `/ext` に適用される場合は 429 を GiracleApiError で受け取る
