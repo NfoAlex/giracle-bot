@@ -248,6 +248,24 @@ describe("GiracleBot", () => {
     expect(closed).toBe(1);
   });
 
+  test("fatal ERROR 中に error ハンドラが start() しても、各セッションで close が 1 回ずつ出る", () => {
+    const b = newBot();
+    bot = b;
+    let closed = 0;
+    b.on("close", () => (closed += 1));
+    b.on("error", () => b.start()); // ハンドラ内で再起動
+    b.start();
+
+    latestMock().receive(JSON.stringify({ signal: "ERROR", data: "Invalid token" }));
+
+    expect(closed).toBe(1); // 1 セッション目の close
+    expect(MockWebSocket.instances).toHaveLength(2); // 再起動済み
+
+    b.stop();
+
+    expect(closed).toBe(2); // close が飲まれると 1 のまま
+  });
+
   test("ERROR signal 時、error リスナー未登録でも throw せず console.error にフォールバック", () => {
     const b = newBot();
     bot = b;

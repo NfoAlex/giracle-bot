@@ -90,11 +90,12 @@ export class GiracleBot extends EventEmitter {
     this.socket.onOpen = () => this.emit("open");
     this.socket.onError = (err) => {
       // ERROR signal（トークン無効・未承認・BAN/削除）。fatal で終了する。
-      // ソケットを破棄してから通知し、stop() → start() での再起動を可能にする。
+      // ソケットを破棄し、close → error の順に通知する（close を先に確定させないと、
+      // error ハンドラの start() が closed を再武装して以降 close が出なくなる）。
       this.socket?.stop();
       this.socket = null;
-      this.emitError(err);
       this.emitClose();
+      this.emitError(err);
     };
     this.closed = false;
     this.socket.start();

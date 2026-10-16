@@ -79,7 +79,7 @@ function report(err: unknown) {
 1. **send にはチャンネル参加が必須。** 対象チャンネルに Bot ユーザーが参加していないと 400（`You are not joined this channel`）。参加は作成者が通常ユーザー API で行う。一方 `message` の受信は「閲覧可能」なチャンネル（ロールの可視設定）に及ぶので、受信できても送信できるとは限らない。
 2. **`message` の signal 名は `message::UpdateMessage`。** サーバーは新規メッセージも bot 購読トピックには Update として流す。フレームワークが createdAt の有無で振り分けるため、利用側はイベント名だけ見ればよい。
 3. **エラー分岐は `err.status` のみ。** `err.body` の文言はサーバー実装依存。400 = Bot 無効（`Bot is not enabled`）・空・長すぎ・未参加・返信先なし、401 = token 不正 / 未承認 / 無効化。文言で `if (body.includes(...))` を書かない。
-4. **`ERROR` signal は fatal。** 再接続しない（`error` → `close`）。原因はトークン無効・未承認・無効化など。401 が続く場合は token か承認状態を疑い、コードではなく運用（管理者への確認）を促す。
+4. **`ERROR` signal は fatal。** 再接続しない（`close` → `error`）。原因はトークン無効・未承認・無効化など。401 が続く場合は token か承認状態を疑い、コードではなく運用（管理者への確認）を促す。
 5. **HTTP 例外は投げっぱなし。** `sendMessage` は reject する。`await ... .catch(report)` か `try/catch` を必ず付ける。
 6. **送信前バリデーション。** 空白のみ / 長すぎはサーバーが 400 を返す。ユーザー入力をそのまま送らず `trim()` し、`startsWith("!cmd")` 系は空ボディを弾く。
 7. **メンションは `@<userId>` 文字列。** 自分へのメンション検知は `inbox` イベントで受けるのが確実（本文の mention 判定には Bot の userId を知る必要がある）。メンション通知はチャンネル参加者が送った場合のみ来る。
