@@ -189,6 +189,19 @@ describe("GiracleSocket ping", () => {
     expect(pings.length).toBeGreaterThanOrEqual(2);
   });
 
+  test("pingIntervalMs: 0 は既定値扱いになり、即切断ループにならない", async () => {
+    const s = makeSocket({ pingIntervalMs: 0, reconnectBaseMs: 0 });
+    s.start();
+    const ws = latestMock();
+    ws.open();
+
+    // 0 が素通りすると liveness 閾値 0 のため open 直後に close される。既定値（30s）なら切断しない
+    await sleep(50);
+
+    expect(ws.closed).toBe(false);
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
   test("pong 無応答 → 半死接続とみなし close して再接続する", async () => {
     const s = makeSocket({
       pingIntervalMs: 15,
