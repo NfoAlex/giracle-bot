@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { GiracleBot } from "../src/bot";
 import type { BotOptions } from "../src/types";
-import { makeMessage, MockWebSocket, latestMock } from "./mockWebSocket";
+import { makeMessage, makeUpdate, MockWebSocket, latestMock } from "./mockWebSocket";
 
 const SERVER = "http://localhost:3000";
 const TOKEN = "tok-1";
@@ -20,23 +20,6 @@ afterEach(() => {
   bot = null;
   MockWebSocket.instances = [];
 });
-
-/** fetch モック: POST /ext/message/send に固定の返信（userId=replyUser）を返す */
-function okFetch(
-  replyMessage = makeMessage({ userId: "alice" }),
-): typeof fetch {
-  return (async (input: unknown) => {
-    const url = String(input);
-    if (url.endsWith("/ext/message/send")) {
-      return new Response(JSON.stringify(replyMessage), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    return new Response("not found", { status: 404 });
-  }) as typeof fetch;
-}
 
 /** WebSocketImpl を必ず Mock に差し込んで生成するヘルパー */
 function newBot(over: Partial<BotOptions> = {}): GiracleBot {
@@ -63,8 +46,8 @@ describe("GiracleBot", () => {
     expect(latestMock().options?.headers).toEqual({ Authorization: TOKEN });
   });
 
-  test("start 後、他ユーザーの message::SendMessage で message イベント発火", () => {
-    const b = newBot({ botUserId: "me" });
+  test("他ユーザーの新規メッセージ（全行分 UpdateMessage）で message イベント発火", () => {
+    const b = newBot();
     bot = b;
     const messages: unknown[] = [];
     b.on("message", (m) => messages.push(m));
@@ -72,166 +55,75 @@ describe("GiracleBot", () => {
 
     latestMock().receive(
       JSON.stringify({
-        signal: "message::SendMessage",
+        signal: "message::UpdateMessage",
         data: makeMessage({ id: "m2", userId: "other" }),
       }),
     );
 
     expect(messages).toHaveLength(1);
     expect((messages[0] as { id: string }).id).toBe("m2");
+    expect((messages[0] as { userId: string }).userId).toBe("other");
   });
 
-  test("botUserId 一致の自己送信は message イベントを発火しない", () => {
-    const b = newBot({ botUserId: "me" });
+  test("編集（部分行 UpdateMessage）は message ではなく messageUpdate で発火", () => {
+    const b = newBot();
     bot = b;
     const messages: unknown[] = [];
-    b.on("message", (m) => messages.push(m));
-    b.start();
-
-    latestMock().receive(
-      JSON.stringify({
-        signal: "message::SendMessage",
-        data: makeMessage({ userId: "me" }),
-      }),
-    );
-
-    expect(messages).toHaveLength(0);
-  });
-
-  test("botUserId 未設定: sendMessage 成功の userId が remoteUserId にキャッシュされ、以後その signal はフィルタ", async () => {
-    const b = newBot({ fetchImpl: okFetch() });
-    bot = b;
-    const messages: unknown[] = [];
-    b.on("message", (m) => messages.push(m));
-    b.start();
-
-    expect(b.remoteUserId).toBeUndefined();
-
-    const sent = await b.sendMessage("c1", "hi");
-    expect(sent.userId).toBe("alice");
-    expect(b.remoteUserId).toBe("alice");
-
-    // 自分（alice）の送信 → フィルタされる
-    latestMock().receive(
-      JSON.stringify({
-        signal: "message::SendMessage",
-        data: makeMessage({ userId: "alice" }),
-      }),
-    );
-    // 他人 → emit される
-    latestMock().receive(
-      JSON.stringify({
-        signal: "message::SendMessage",
-        data: makeMessage({ userId: "bob" }),
-      }),
-    );
-
-    expect(messages).toHaveLength(1);
-    expect((messages[0] as { userId: string }).userId).toBe("bob");
-  });
-
-  test("自己 echo が HTTP レスポンスより先に届いても message は発火しない（identity race）", async () => {
-    // send の応答を遅延させ、その間に自己 echo の signal が届く状況を作る
-    let resolveSend: ((res: Response) => void) | undefined;
-    const fetchImpl = ((input: unknown) => {
-      if (!String(input).endsWith("/ext/message/send")) {
-        return Promise.resolve(new Response("no", { status: 404 }));
-      }
-
-      return new Promise<Response>((r) => (resolveSend = r));
-    }) as typeof fetch;
-    const b = newBot({ fetchImpl });
-    bot = b;
-    const messages: unknown[] = [];
-    b.on("message", (m) => messages.push(m));
-    b.start();
-
-    const sent = b.sendMessage("c1", "hi");
-    latestMock().receive(
-      JSON.stringify({
-        signal: "message::SendMessage",
-        data: makeMessage({ userId: "alice", content: "hi" }),
-      }),
-    );
-
-    // 未確定かつ送信中なので保留（まだ emit しない）
-    expect(messages).toHaveLength(0);
-
-    resolveSend?.(
-      new Response(JSON.stringify(makeMessage({ userId: "alice" })), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    await sent;
-
-    expect(b.remoteUserId).toBe("alice");
-    expect(messages).toHaveLength(0); // 保留分は自己送信と判定され捨てる
-  });
-
-  test("送信中に届いた他人の message は取りこぼさず、送信完了後に発火する", async () => {
-    let resolveSend: ((res: Response) => void) | undefined;
-    const fetchImpl = ((input: unknown) => {
-      if (!String(input).endsWith("/ext/message/send")) {
-        return Promise.resolve(new Response("no", { status: 404 }));
-      }
-
-      return new Promise<Response>((r) => (resolveSend = r));
-    }) as typeof fetch;
-    const b = newBot({ fetchImpl });
-    bot = b;
-    const messages: unknown[] = [];
-    b.on("message", (m) => messages.push(m));
-    b.start();
-
-    const sent = b.sendMessage("c1", "hi");
-    latestMock().receive(
-      JSON.stringify({
-        signal: "message::SendMessage",
-        data: makeMessage({ id: "m9", userId: "bob" }),
-      }),
-    );
-
-    expect(messages).toHaveLength(0); // 保留中
-
-    resolveSend?.(
-      new Response(JSON.stringify(makeMessage({ userId: "alice" })), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    await sent;
-
-    expect(messages).toHaveLength(1); // 他人の分は emit される
-    expect((messages[0] as { id: string }).id).toBe("m9");
-  });
-
-  test("start 前の stop() では close を発火しない", () => {
-    const b = newBot({ botUserId: "me" });
-    bot = b;
-    let closed = 0;
-    b.on("close", () => (closed += 1));
-
-    b.stop();
-
-    expect(closed).toBe(0);
-  });
-
-  test("messageUpdate / inbox のマッピング", () => {
-    const b = newBot({ botUserId: "me" });
-    bot = b;
     const updates: unknown[] = [];
-    const inboxes: unknown[] = [];
+    b.on("message", (m) => messages.push(m));
     b.on("messageUpdate", (u) => updates.push(u));
-    b.on("inbox", (i) => inboxes.push(i));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({ signal: "message::UpdateMessage", data: makeUpdate({ id: "m3" }) }),
+    );
+
+    expect(messages).toHaveLength(0);
+    expect(updates).toEqual([makeUpdate({ id: "m3" })]);
+  });
+
+  test("id 無しの UpdateMessage はイベントを発火しない", () => {
+    const b = newBot();
+    bot = b;
+    const got: unknown[] = [];
+    b.on("message", (m) => got.push(m));
+    b.on("messageUpdate", (u) => got.push(u));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({ signal: "message::UpdateMessage", data: { content: "x" } }),
+    );
+
+    expect(got).toHaveLength(0);
+  });
+
+  test("createdAt 無しでも id + channelId + userId があれば部分行として messageUpdate", () => {
+    const b = newBot();
+    bot = b;
+    const messages: unknown[] = [];
+    const updates: unknown[] = [];
+    b.on("message", (m) => messages.push(m));
+    b.on("messageUpdate", (u) => updates.push(u));
     b.start();
 
     latestMock().receive(
       JSON.stringify({
         signal: "message::UpdateMessage",
-        data: { id: "m1", content: "edited", isEdited: true },
+        data: { id: "m4", channelId: "c1", userId: "u1", content: "x", isEdited: true },
       }),
     );
+
+    expect(messages).toHaveLength(0);
+    expect(updates).toHaveLength(1);
+  });
+
+  test("inbox::Added のマッピング（メンション）", () => {
+    const b = newBot();
+    bot = b;
+    const inboxes: unknown[] = [];
+    b.on("inbox", (i) => inboxes.push(i));
+    b.start();
+
     latestMock().receive(
       JSON.stringify({
         signal: "inbox::Added",
@@ -239,46 +131,76 @@ describe("GiracleBot", () => {
       }),
     );
 
-    expect(updates).toEqual([{ id: "m1", content: "edited", isEdited: true }]);
     expect(inboxes).toHaveLength(1);
     expect((inboxes[0] as { type: string }).type).toBe("mention");
-    expect((inboxes[0] as { message: { id: string } }).message.id).toBe(
-      "inbox-m",
-    );
+    expect((inboxes[0] as { message: { id: string } }).message.id).toBe("inbox-m");
+  });
+
+  test("message 無しの inbox::Added は発火しない", () => {
+    const b = newBot();
+    bot = b;
+    const inboxes: unknown[] = [];
+    b.on("inbox", (i) => inboxes.push(i));
+    b.start();
+
+    latestMock().receive(JSON.stringify({ signal: "inbox::Added", data: { type: "mention" } }));
+
+    expect(inboxes).toHaveLength(0);
+  });
+
+  test("sendMessage は { channelId, message, replyingMessageId } を POST する", async () => {
+    const b = newBot({
+      fetchImpl: (async (input: unknown, init?: RequestInit) => {
+        expect(String(input)).toBe(`${SERVER}/ext/message/send`);
+        expect(init?.method).toBe("POST");
+
+        return new Response(
+          JSON.stringify({ message: "Sent message", data: { messageSaved: makeMessage(), messageReplyingTo: null } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }) as typeof fetch,
+    });
+    bot = b;
+    const sent = await b.sendMessage("c1", "hi", "m9");
+
+    expect(sent.id).toBe("m1");
   });
 
   test("WS ERROR signal → error イベント発火", () => {
-    const b = newBot({ botUserId: "me" });
+    const b = newBot();
     bot = b;
     const errs: Error[] = [];
     b.on("error", (e) => errs.push(e));
     b.start();
 
     latestMock().receive(
-      JSON.stringify({
-        signal: "ERROR",
-        data: "Authorization header is invalid",
-      }),
+      JSON.stringify({ signal: "ERROR", data: "Bot token not valid" }),
     );
 
     expect(errs).toHaveLength(1);
-    expect(errs[0]?.message).toBe("Authorization header is invalid");
+    expect(errs[0]?.message).toBe("Bot token not valid");
   });
 
-  test("stop() → close イベント発火", () => {
-    const b = newBot({ botUserId: "me" });
+  test("stop() 前は close を発火しない / stop() で 1 回発火", () => {
+    const b = newBot();
     bot = b;
     let closed = 0;
     b.on("close", () => (closed += 1));
-    b.start();
 
     b.stop();
+
+    expect(closed).toBe(0);
+    const b2 = newBot();
+    bot = b2;
+    b2.on("close", () => (closed += 1));
+    b2.start();
+    b2.stop();
 
     expect(closed).toBe(1);
   });
 
   test("start() を 2 回呼んでもソケットは 1 個だけ", () => {
-    const b = newBot({ botUserId: "me" });
+    const b = newBot();
     bot = b;
     b.start();
     b.start();
@@ -287,16 +209,14 @@ describe("GiracleBot", () => {
   });
 
   test("ERROR signal 後の stop() で close は合計 1 回", () => {
-    const b = newBot({ botUserId: "me" });
+    const b = newBot();
     bot = b;
     let closed = 0;
     b.on("error", () => {});
     b.on("close", () => (closed += 1));
     b.start();
 
-    latestMock().receive(
-      JSON.stringify({ signal: "ERROR", data: "unauthorized" }),
-    );
+    latestMock().receive(JSON.stringify({ signal: "ERROR", data: "This bot is disabled" }));
     expect(closed).toBe(1);
 
     b.stop();
@@ -304,7 +224,7 @@ describe("GiracleBot", () => {
   });
 
   test("ERROR signal 時、error リスナー未登録でも throw せず console.error にフォールバック", () => {
-    const b = newBot({ botUserId: "me" });
+    const b = newBot();
     bot = b;
     const original = console.error;
     const logged: unknown[][] = [];
@@ -317,7 +237,7 @@ describe("GiracleBot", () => {
 
       expect(() =>
         latestMock().receive(
-          JSON.stringify({ signal: "ERROR", data: "unauthorized" }),
+          JSON.stringify({ signal: "ERROR", data: "Bot token not valid" }),
         ),
       ).not.toThrow();
     } finally {
@@ -328,43 +248,9 @@ describe("GiracleBot", () => {
     expect(String(logged[0]?.[0])).toContain("giracle-bot: unhandled error:");
   });
 
-  test("id 無しの message::UpdateMessage は messageUpdate を発火しない", () => {
-    const b = newBot({ botUserId: "me" });
-    bot = b;
-    const updates: unknown[] = [];
-    b.on("messageUpdate", (u) => updates.push(u));
-    b.start();
-
-    latestMock().receive(
-      JSON.stringify({
-        signal: "message::UpdateMessage",
-        data: { content: "x" },
-      }),
-    );
-
-    expect(updates).toHaveLength(0);
-  });
-
-  test("userId 無しの message::SendMessage は message を発火しない", () => {
-    const b = newBot({ botUserId: "me" });
-    bot = b;
-    const messages: unknown[] = [];
-    b.on("message", (m) => messages.push(m));
-    b.start();
-
-    latestMock().receive(
-      JSON.stringify({
-        signal: "message::SendMessage",
-        data: { id: "m", content: "x" },
-      }),
-    );
-
-    expect(messages).toHaveLength(0);
-  });
-
   describe("open イベント", () => {
     test("WS open 前は発火せず、open 1 回につき 1 回だけ発火", () => {
-      const b = newBot({ botUserId: "me" });
+      const b = newBot();
       bot = b;
       const opened: unknown[][] = [];
       b.on("open", (...args) => opened.push(args));
@@ -378,7 +264,7 @@ describe("GiracleBot", () => {
     });
 
     test("start() を重ねても open は 1 回だけ（ソケットが 1 個のため）", () => {
-      const b = newBot({ botUserId: "me" });
+      const b = newBot();
       bot = b;
       let opened = 0;
       b.on("open", () => (opened += 1));
@@ -392,7 +278,7 @@ describe("GiracleBot", () => {
     });
 
     test("再接続した新ソケットの open でも発火する（接続ごとに 1 回）", async () => {
-      const b = newBot({ botUserId: "me", reconnectBaseMs: 10 });
+      const b = newBot({ reconnectBaseMs: 10 });
       bot = b;
       let opened = 0;
       b.on("open", () => (opened += 1));
@@ -411,7 +297,7 @@ describe("GiracleBot", () => {
     });
 
     test("fatal ERROR 後の start() でも新ソケットの open が発火する", () => {
-      const b = newBot({ botUserId: "me" });
+      const b = newBot();
       bot = b;
       let opened = 0;
       b.on("open", () => (opened += 1));
@@ -421,9 +307,7 @@ describe("GiracleBot", () => {
       latestMock().open();
       expect(opened).toBe(1);
 
-      latestMock().receive(
-        JSON.stringify({ signal: "ERROR", data: "unauthorized" }),
-      );
+      latestMock().receive(JSON.stringify({ signal: "ERROR", data: "unauthorized" }));
 
       b.start(); // ERROR でソケットは破棄済み → 再起動できる
       expect(MockWebSocket.instances).toHaveLength(2);

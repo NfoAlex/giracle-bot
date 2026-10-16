@@ -183,7 +183,7 @@ describe("GiracleSocket ping", () => {
     }
 
     const pings = ws.sent.filter(
-      (m) => m === JSON.stringify({ signal: "ping", data: "pong" }),
+      (m) => m === JSON.stringify({ signal: "ping", data: "ping" }),
     );
 
     expect(pings.length).toBeGreaterThanOrEqual(2);
