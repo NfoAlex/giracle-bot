@@ -3,8 +3,8 @@
  * 合わせる（過剰な型にしない）。
  *
  * Bot 関係の API 現状:
- * - HTTP は POST /ext/message/send のみ（edit / delete / makeGet はサーバー側に存在しない）
- * - レスポンスは { message, data } ラッパー付き
+ * - HTTP は POST /ext/message/send と POST /ext/message/edit（delete / makeGet はサーバー側に存在しない）
+ * - send のレスポンスは { message, data } ラッパー付き、edit は行そのもの
  * - WS は bot::channel::<channelId> と user::<remoteUserId> を購読し、
  *   user 送信 / 編集をともに signal "message::UpdateMessage" で受ける
  */
@@ -62,6 +62,7 @@ export type Message = {
  * 編集更新（signal "message::UpdateMessage" の部分行ペイロード）。
  * 新規メッセージと同一 signal のため、フレームワーク側で createdAt の有無
  * （部分行は createdAt を持たない）により振り分ける。
+ * POST /ext/message/edit の成功レスポンスも同じ形（updateMessage の returning）。
  */
 export type MessageUpdate = {
   id: string;

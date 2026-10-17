@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { GiracleClient } from "../src/client";
 import { GiracleApiError } from "../src/errors";
-import { makeMessage } from "./mockWebSocket";
+import { makeMessage, makeUpdate } from "./mockWebSocket";
 
 /** 呼び出し記録付きの fetch モック。Response は Bun/undici の実物を使う（サーバーは立てない）。 */
 function mockFetch(handler: (url: string, init?: RequestInit) => Response): {
@@ -157,6 +157,53 @@ describe("GiracleClient", () => {
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
     const err = await client.sendMessage("c1", "hi").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).body).toBe("unexpected response shape");
+  });
+
+  test("editMessage 成功: 行そのもの（ラッパー無し）を返す", async () => {
+    const row = makeUpdate({ id: "m-abc", content: "after" });
+    const { impl, calls } = mockFetch((url, init) => {
+      expect(url).toBe(`${SERVER}/ext/message/edit`);
+      expect(init?.method).toBe("POST");
+
+      return okJson(row);
+    });
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const got = await client.editMessage("m-abc", "after");
+
+    expect(got).toEqual(row);
+    expect(got.content).toBe("after");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      messageId: "m-abc",
+      message: "after",
+    });
+  });
+
+  test("editMessage 403 → GiracleApiError(status=403, body 保持)", async () => {
+    const { impl } = mockFetch(() => textRes(403, "You are not sender of this message"));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.editMessage("m1", "x").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).status).toBe(403);
+    expect((err as GiracleApiError).body).toBe("You are not sender of this message");
+  });
+
+  test("editMessage 200 だが id 無し JSON → GiracleApiError", async () => {
+    const { impl } = mockFetch(() => okJson({ message: "ok" }));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.editMessage("m1", "x").then(
       () => null,
       (e: unknown) => e,
     );

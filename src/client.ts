@@ -1,5 +1,5 @@
 import { GiracleApiError } from "./errors";
-import type { Message } from "./types";
+import type { Message, MessageUpdate } from "./types";
 
 /** POST で JSON を送るための共通ヘッダ */
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -11,8 +11,8 @@ type SendResponse = {
 };
 
 /**
- * /ext API の fetch ラッパ。現在ログインしているエンドポイントは
- * POST /ext/message/send のみ（他はサーバー側に存在しない）。
+ * /ext API の fetch ラッパ。対応エンドポイントは
+ * POST /ext/message/send と POST /ext/message/edit。
  */
 export class GiracleClient {
   private baseUrl: string;
@@ -50,6 +50,27 @@ export class GiracleClient {
     }
 
     return res.data.messageSaved as Message;
+  }
+
+  /**
+   * POST /ext/message/edit。ボディ: { messageId, message }。
+   * 戻りは部分行（updatedAt 等は無い）。send と違い { message, data } ラッパーが無い。
+   * 編集できるのは Bot 自身が送信したメッセージのみ（他人の行は 403）。
+   */
+  async editMessage(
+    messageId: string,
+    message: string,
+  ): Promise<MessageUpdate> {
+    const res = await this.call("/ext/message/edit", "POST", {
+      messageId,
+      message,
+    });
+
+    if (!isRow(res)) {
+      throw new GiracleApiError(200, "unexpected response shape");
+    }
+
+    return res as MessageUpdate;
   }
 
   /** body 省略時は content-type を付けない */
@@ -91,4 +112,13 @@ export class GiracleClient {
   private authHeaders(): Record<string, string> {
     return { Authorization: this.token };
   }
+}
+
+/** メッセージ行らしさの最小判定（フレームワークが使う id だけ見る） */
+function isRow(data: unknown): data is Record<string, unknown> {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    typeof (data as Record<string, unknown>).id === "string"
+  );
 }

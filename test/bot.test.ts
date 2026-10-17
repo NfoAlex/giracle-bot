@@ -191,6 +191,30 @@ describe("GiracleBot", () => {
     expect(sent.id).toBe("m1");
   });
 
+  test("editMessage は { messageId, message } を /ext/message/edit へ POST する", async () => {
+    const b = newBot({
+      fetchImpl: (async (input: unknown, init?: RequestInit) => {
+        expect(String(input)).toBe(`${SERVER}/ext/message/edit`);
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          messageId: "m1",
+          message: "after",
+        });
+
+        return new Response(JSON.stringify(makeUpdate({ id: "m1", content: "after" })), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }) as typeof fetch,
+    });
+    bot = b;
+    const edited = await b.editMessage("m1", "after");
+
+    expect(edited.id).toBe("m1");
+    expect(edited.content).toBe("after");
+    expect(edited.isEdited).toBeTrue();
+  });
+
   test("WS ERROR signal → error イベント発火", () => {
     const b = newBot();
     bot = b;

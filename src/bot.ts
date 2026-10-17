@@ -143,6 +143,14 @@ export class GiracleBot extends EventEmitter {
     return this.client.sendMessage(channelId, message, replyingMessageId);
   }
 
+  /**
+   * POST /ext/message/edit。編集できるのは Bot 自身が送ったメッセージのみ。
+   * 自分で送信した行の id は sendMessage の戻り値から取る（Bot の送信は WS に流れない）。
+   */
+  editMessage(messageId: string, message: string): Promise<MessageUpdate> {
+    return this.client.editMessage(messageId, message);
+  }
+
   private handleSignal(env: { signal: string; data: unknown }): void {
     switch (env.signal) {
       case "message::UpdateMessage": {
