@@ -54,6 +54,17 @@ describe("GiracleClient", () => {
     expect(got.id).toBe("m-abc");
   });
 
+  test("sendMessage 成功: 現行サーバーの保存行そのものを Message として返す", async () => {
+    const msg = makeMessage({ id: "m-raw" });
+    const { impl } = mockFetch(() => okJson(msg));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const got = await client.sendMessage("c1", "hi");
+
+    expect(got).toEqual(msg);
+    expect(got.id).toBe("m-raw");
+  });
+
   test("sendMessage のリクエストボディ形状。replyingMessageId 省略時はボディに載らない", async () => {
     const { impl, calls } = mockFetch(() =>
       okJson({ message: "Sent message", data: { messageSaved: makeMessage(), messageReplyingTo: null } }),

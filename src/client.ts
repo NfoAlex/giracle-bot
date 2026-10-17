@@ -4,10 +4,12 @@ import type { DeletedMessage, Message, MessageUpdate } from "./types";
 /** POST で JSON を送るための共通ヘッダ */
 const JSON_HEADERS = { "content-type": "application/json" };
 
-/** POST /ext/message/send のレスポンス。data は ServiceMessage.Send の戻り（保存行 + 返信先行） */
+/**
+ * 現行 giracle-backend の /ext/message/send は保存行そのものを返す。
+ * 旧ビルドは { message, data: { messageSaved } } で包むため、そちらも受ける。
+ */
 type SendResponse = {
-  message: unknown;
-  data: { messageSaved?: unknown; messageReplyingTo?: unknown } | null;
+  data?: { messageSaved?: unknown } | null;
 };
 
 /**
@@ -30,25 +32,23 @@ export class GiracleClient {
     message: string,
     replyingMessageId?: string,
   ): Promise<Message> {
-    const res = (await this.call("/ext/message/send", "POST", {
+    const res: unknown = await this.call("/ext/message/send", "POST", {
       channelId,
       message,
       replyingMessageId,
-    })) as SendResponse | undefined;
+    });
 
-    // ラッパーの data.messageSaved を Message として返す。形状が壊れていればエラーを見せる
-    if (
-      res === null ||
-      typeof res !== "object" ||
-      typeof res.data !== "object" ||
-      res.data === null ||
-      typeof res.data.messageSaved !== "object" ||
-      res.data.messageSaved === null
-    ) {
+    // 行そのもの、または ラッパーの data.messageSaved を Message として返す。
+    // どちらの形状でもなければエラーを見せる
+    const row = isRow(res)
+      ? res
+      : (res as SendResponse | undefined)?.data?.messageSaved;
+
+    if (!isRow(row)) {
       throw new GiracleApiError(200, "unexpected response shape");
     }
 
-    return res.data.messageSaved as Message;
+    return row as Message;
   }
 
   /**
