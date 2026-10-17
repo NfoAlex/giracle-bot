@@ -186,6 +186,26 @@ describe("GiracleBot", () => {
     expect(inboxes).toHaveLength(0);
   });
 
+  test("type が文字列でない inbox::Added は発火しない（InboxAdded.type は string 契約）", () => {
+    const b = newBot();
+    bot = b;
+    const inboxes: unknown[] = [];
+    b.on("inbox", (i) => inboxes.push(i));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({ signal: "inbox::Added", data: { message: makeMessage({ id: "t1" }) } }),
+    );
+    latestMock().receive(
+      JSON.stringify({
+        signal: "inbox::Added",
+        data: { message: makeMessage({ id: "t2" }), type: 1 },
+      }),
+    );
+
+    expect(inboxes).toHaveLength(0);
+  });
+
   test("sendMessage は { channelId, message, replyingMessageId } を POST する", async () => {
     const b = newBot({
       fetchImpl: (async (input: unknown, init?: RequestInit) => {

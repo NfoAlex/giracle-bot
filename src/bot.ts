@@ -186,14 +186,15 @@ export class GiracleBot extends EventEmitter {
         return;
       }
       case "inbox::Added": {
-        // メンション通知。message が行っぽければ流す。
+        // メンション通知。message が行っぽく、type が文字列（InboxAdded.type の契約）のときだけ流す。
         if (
           typeof env.data === "object" &&
           env.data !== null &&
           hasStr(
             (env.data as { message?: unknown }).message,
             "id",
-          )
+          ) &&
+          typeof (env.data as { type?: unknown }).type === "string"
         ) {
           this.emit("inbox", env.data as InboxAdded);
         }
