@@ -3,8 +3,8 @@
 Giracle サーバー向け Bot フレームワーク（Bun ランタイム用、依存ゼロ）。
 
 ```text
-Bot (Bun) ──HTTP──→ POST /ext/message/send   Authorization: <tokenCode>
-          ←─WS──── /ext/ws                   signal: message::UpdateMessage 等
+Bot (Bun) ──HTTP──→ POST /ext/message/send | edit   Authorization: <tokenCode>
+          ←─WS──── /ext/ws                           signal: message::UpdateMessage 等
 ```
 
 ## セットアップ
@@ -45,29 +45,32 @@ bot.start();
 
 `SKILL.md` はこのフレームワークで Bot を実装するためのエージェント向け手順書。新しい Bot の作成・コマンド/返信/編集監視の実装・イベントハンドラ追加を依頼する際は、これを読ませると API 表面・落とし穴・モックでの検証手順がそのまま使える。
 
-動く雛形は `example/`（`echo` / `reply-bot` / `edit-watcher` / `ping`）。
+動く雛形は `example/`（`echo` / `reply-bot` / `edit-watcher` / `edit-bot` / `ping`）。
 
 ## API
 
 | メソッド | 説明 |
 | --- | --- |
 | `sendMessage(channelId, message, replyingMessageId?)` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの `data.messageSaved` をほどいて Message を返す |
+| `editMessage(messageId, message)` | 編集（**Bot 自身が送った行のみ**。他人の行は 403）。部分行 `{ id, channelId, userId, content, isEdited }` を返す（`createdAt` は無い） |
 
-Bot 用 HTTP API はこの 1 つのみ。**`getMessage` / `editMessage` / `deleteMessage` はサーバー側 `/ext` には存在しない**（通常ユーザー用の `/message` API は別に存在するが Bot は Cookie では使えない）。
+Bot 用 HTTP API はこの 2 つのみ。**`getMessage` / `deleteMessage` はサーバー側 `/ext` には存在しない**（通常ユーザー用の `/message` API は別に存在するが Bot は Cookie では使えない）。
 
 メンションは本文に `@<userId>` を書くとサーバー側で処理される（Bot 送信からは通知されない。ユーザー送信時のみ）。
 
-エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。err ステータス: 400 `Bot is not enabled on this server` / `Message is empty` / `Message is too long. Maximum length is <N>` / `You are not joined this channel` / `Replying message not found`、401 `Invalid token` / `Bot is not approved yet` / `This bot is disabled`。
+エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。err ステータス: 400 `Bot is not enabled on this server` / `Message is empty` / `Message is too long. Maximum length is <N>` / `You are not joined this channel` / `Replying message not found` / `Message is already same`、401 `Invalid token` / `Bot is not approved yet` / `This bot is disabled`、403 `You are not sender of this message`、404 `Message not found`。
 
 ## イベント
 
 | イベント | ペイロード | 説明 |
 | --- | --- | --- |
-| `message` | `Message` | 新規メッセージ（signal は `message::UpdateMessage`。全行分が流れる）。システムメッセージも流れる。**Bot 自身の送信は WS 配信されない**ため自己送信ガードは不要 |
-| `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み |
+| `message` | `Message` | 新規メッセージ（signal は `message::UpdateMessage`。全行分が流れる）。システムメッセージも流れる。**Bot として送信したメッセージは WS 配信されない**ため自己送信ガードは不要 |
+| `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み。**Bot として編集した結果も `messageUpdate` には流れない** |
 | `inbox` | `InboxAdded` | Bot がメンション・返信されたとき（`{ message, type: "mention" \| "reply" }`）。メンションはチャンネル参加者が送った場合のみ |
-| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
+| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
 | `close` | なし | `stop()` または fatal エラーによる終了 |
+
+**Bot として送信/編集したメッセージの WS 通知は来ない。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため、`bot::channel::<channelId>` を購読する Bot には届かない。これは自分自身にも他の Bot にも同様で、`message` / `messageUpdate` は**ユーザーの**投稿・編集でしか発火しない。自分が送った行の id や内容は `sendMessage` / `editMessage` の戻り値から取る。
 
 WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。ping は 30 秒間隔で自動送信し、`pong` が 2 周期連続で返らなければ（最終受信から `pingIntervalMs × 2` を超えた次の周期で）半死接続とみなして切断 → 再接続する。
 
@@ -104,7 +107,7 @@ bun run build
 
 ## 注意事項
 
-- **Bot 自身の送信は WS に流れない**。echo でもループにはならないが、Bot は「自分が投稿したメッセージ」を `message` イベントからは知り得ない（sendMessage の戻り値で確認する）
+- **Bot 自身の送信・編集は WS に流れない**（自分にも他の Bot にも届かない）。echo でもループにはならないが、Bot は「自分が投稿・編集したメッセージ」を `message` / `messageUpdate` イベントからは知り得ない（`sendMessage` / `editMessage` の戻り値で確認する）
 - ユーザー送信時、サーバーは bot 購読トピックへ **`message::UpdateMessage`** を発行する。そのため新規メッセージも「Update」という signal 名で届く（フレームワークで振り分け済み）
 - URL プレビュー生成後の更新は `bot::channel` トピックへ配信されない
 - メッセージ削除（`message::MessageDeleted`）は GLOBAL トピックのみのため、Bot には届かない

@@ -4,14 +4,14 @@ description: Giracle Bot フレームワーク（Bun / src/index.ts の GiracleB
 
 # Giracle Bot を作る
 
-Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /ext/message/send`（HTTP）で投稿し、`/ext/ws` で `message::UpdateMessage` 等を受信する。**登録・承認・チャンネル参加はサーバー側の管理 API / 通常ユーザー API）で行う**（フレームワークは登録フローを持たない）。フレームワークがやるのは token 認証・受信 signal の正規化・自動再接続まで。
+Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /ext/message/send`（投稿）と `POST /ext/message/edit`（自分の行の編集）で HTTP を叩き、`/ext/ws` で `message::UpdateMessage` 等を受信する。**登録・承認・チャンネル参加はサーバー側の管理 API / 通常ユーザー API）で行う**（フレームワークは登録フローを持たない）。フレームワークがやるのは token 認証・受信 signal の正規化・自動再接続まで。
 
 ## 0. 作業前に必ず読む
 
 | 読むもの | 得られるもの |
 | --- | --- |
 | `src/types.ts` | イベント名・ペイロード型の唯一の正。推測でイベント名を書かない |
-| `example/echo.ts` `example/reply-bot.ts` `example/edit-watcher.ts` `example/ping.ts` | 動く雛形。新規 Bot はこのどれかを土台にする |
+| `example/echo.ts` `example/reply-bot.ts` `example/edit-watcher.ts` `example/edit-bot.ts` `example/ping.ts` | 動く雛形。新規 Bot はこのどれかを土台にする |
 | `test/bot.test.ts` `test/mockWebSocket.ts` | 実サーバー無しで検証するための注入方法 |
 
 フレームワーク自体（`src/`）は変更しない。Bot の実装は `example/` か利用側プロジェクトのエントリ 1 ファイルに閉じる。
@@ -29,9 +29,10 @@ bot.start();                       // WS 接続開始（戻り値なし、非同
 bot.stop();                        // 明示停止 + close イベント
 
 await bot.sendMessage(channelId, content, replyId?);   // Message（送信結果）
+await bot.editMessage(messageId, content);             // MessageUpdate（自分の送信行のみ）
 ```
 
-Bot 用 HTTP API は **send の 1 つのみ**。編集・削除・取得は `/ext` に存在しない。
+Bot 用 HTTP API は **send と edit の 2 つのみ**。削除・取得は `/ext` に存在しない。
 
 イベント（`bot.on(name, handler)`）:
 
@@ -43,7 +44,11 @@ Bot 用 HTTP API は **send の 1 つのみ**。編集・削除・取得は `/ex
 | `error` | `Error` | WS `ERROR` signal の受信時のみ（fatal。`close` も続けて発火）。HTTP 失敗は `sendMessage` の reject なので catch する |
 | `close` | なし | `stop()` または `ERROR` signal 後 |
 
-無い機能: メッセージ編集・削除（Bot API に無い）、リアクション、タイピング、削除の受信（Bot は `GLOBAL` を購読しないため `message::MessageDeleted` は届かない）、URL プレビューの更新配信。必要になったら「フレームワークのスコープ外」と報告する。
+無い機能: メッセージ削除・取得（Bot API に無い）、リアクション、タイピング、削除の受信（Bot は `GLOBAL` を購読しないため `message::MessageDeleted` は届かない）、URL プレビューの更新配信。必要になったら「フレームワークのスコープ外」と報告する。
+
+`editMessage` の制限: **Bot 自身（`remoteUserId`）名義の行のみ**。他人の行は 403、同一内容は 400、存在しない行は 404。編集対象の `messageId` は自分の `sendMessage` の戻り値から取る（自分の送信は WS に流れないため）。
+
+**Bot として送信/編集したメッセージの WS 通知は来ない。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため、Bot が購読する `bot::channel::<channelId>` には自分も他 Bot も届かない。`message` / `messageUpdate` が発火するのは**ユーザー**の投稿・編集時だけ。送信・編集の結果は HTTP の戻り値で受ける。
 
 ## 2. ゴールデンパス
 
@@ -86,7 +91,7 @@ function report(err: unknown) {
 8. **Bun 専用・依存ゼロ。** `fetch` / `WebSocket` はネイティブ。npm パッケージを足さない。Node API 前提のライブラリ（`ws`, `node-fetch` 等）も不要。
 9. **SQLite 書き込み競合。** 連投・全チャンネル一斉送信は避ける。必要なら Bot 側で送信間隔を空ける。
 10. **システムメッセージを応答対象にしない。** `isSystemMessage: true`（`content` は JSON 文字列）が `message` に流れる。`if (msg.isSystemMessage) return;` をガードに足す。
-11. **Bot 送信は他 Bot / 自分へ配信されない。** `/ext` の送信は WS へ publish しないため、Bot 同士・自分自身の echo ループは起きない。その代わり自分の投稿を `message` イベントからは追えない。
+11. **Bot として送信/編集したメッセージの WS 通知は来ない（自分にも他 Bot にも）。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため、Bot が購読する `bot::channel::` には届かず、Bot 同士・自分自身の echo ループも起きない。その代わり自分の投稿・編集を `message` / `messageUpdate` イベントからは追えない（`sendMessage` / `editMessage` の戻り値を使う）。
 12. **不正 payload は無言で破棄される。** `message::UpdateMessage` は全行分（`createdAt` あり）と部分行（`id` + `isEdited` が boolean）だけをイベント化し、他は log も出さず捨てる。イベントが突然来なくなったら接続ログを見たうえでバックエンドの payload 形状（`createdAt` / `isEdited`）を疑う。
 
 ## 4. 実装パターン
@@ -95,6 +100,7 @@ function report(err: unknown) {
 - **返信**: `bot.sendMessage(msg.channelId, body, msg.id)` で `replyingMessageId` を渡す。
 - **メンション応答**: `inbox` イベントで `item.message` に反応する（`example/reply-bot.ts`）。
 - **編集監視**: `messageUpdate`。内容が要るなら部分行の `content` を使う（最新全体が必要ならメッセージ取得 API は Bot に無いので、WS の `message` と照合して自分で持つ）。
+- **自分の投稿を後で書き換える**: `const sent = await bot.sendMessage(c, "…"); await bot.editMessage(sent.id, "…");`（進捗表示の更新など）。
 - **チャンネル別挙動**: ハンドラ内で `msg.channelId` を判定する（購読フィルタは無い）。
 
 ## 5. 検証（実機を立てる前にここまで）
