@@ -5,7 +5,7 @@
  * Bot 関係の API 現状:
  * - HTTP は POST /ext/message/send, POST /ext/message/edit, DELETE /ext/message/delete
  *   （makeGet はサーバー側に存在しない）
- * - send のレスポンスは { message, data } ラッパー付き、edit / delete は行そのもの
+ * - send のレスポンスは保存行そのもの（旧ビルドは { message, data } ラッパー付き）、edit / delete も行そのもの
  * - WS は bot::channel::<channelId> と user::<remoteUserId> を購読し、
  *   user 送信 / 編集をともに signal "message::UpdateMessage" で受ける
  */

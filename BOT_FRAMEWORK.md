@@ -31,7 +31,7 @@ Bot開発者                 Giracleサーバー(giracle-backend)
 
 | メソッド | パス | 成功レスポンス |
 | --- | --- | --- |
-| POST | `/ext/message/send` | `{ message: "Sent message", data: { messageSaved: <メッセージ行 + MessageFileAttached 配列>, messageReplyingTo: <返信先行 or null> } }` |
+| POST | `/ext/message/send` | 保存行そのもの（`<メッセージ行 + MessageFileAttached 配列>`）。旧ビルドは `{ message: "Sent message", data: { messageSaved: <行>, messageReplyingTo: <返信先行 or null> } }` で包む |
 | POST | `/ext/message/edit` | `{ id, channelId, userId, content, isEdited: true }`（`updateMessage` の returning。ラッパー無し・`createdAt` 無し） |
 | DELETE | `/ext/message/delete` | `{ id, userId, channelId }`（`getSingleWithMinimum` 相当の削除対象。ラッパー無し・本文無し） |
 
@@ -53,7 +53,7 @@ edit / delete は **Bot 自身（`remoteUserId`）名義のメッセージのみ
 補足:
 
 - **`/ext` のエンドポイントは send / edit / delete のみ。** 旧仕様の `GET /ext/message/:id` / `makeGet` は廃止され、Bot のメッセージ取得はできない。
-- send のレスポンスは通常モジュールと同じ `{ message, data }` ラッパー付き、edit / delete は行そのもの。エラー時はボディがテキスト（JSON ではない）。
+- send のレスポンスは保存行そのもの（旧ビルドは `{ message, data: { messageSaved, messageReplyingTo } }` ラッパー付き）。edit / delete も行そのもの。エラー時はボディがテキスト（JSON ではない）。
 - **Bot の送信・編集・削除は WS へ配信されない。** send / edit は `channel::<channelId>` への publish のため Bot の購読トピック（`bot::channel::`）には届かず、delete は `GLOBAL` への publish だが Bot は `GLOBAL` を購読しない。自分の操作はどの Bot にも届かず、echo ループは原理的に発生しない。
 - Bot 送信でもメンション処理・URL プレビュー通知は走らない（ユーザー送信時のみ）。`bindUrlPreview` が付いているため URL プレビュー行自体は生成され得る。
 - `/ext` には Bot 単位のレート制限は現状適用されていない（全体の anonymous/IP レート制限の対象外）。

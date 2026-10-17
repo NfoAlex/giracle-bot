@@ -51,7 +51,7 @@ bot.start();
 
 | メソッド | 説明 |
 | --- | --- |
-| `sendMessage(channelId, message, replyingMessageId?)` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの `data.messageSaved` をほどいて Message を返す |
+| `sendMessage(channelId, message, replyingMessageId?)` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの保存行（旧ビルドは `data.messageSaved`）をほどいて Message を返す |
 | `editMessage(messageId, message)` | 編集（**Bot 自身が送った行のみ**。他人の行は 403）。部分行 `{ id, channelId, userId, content, isEdited }` を返す（`createdAt` は無い） |
 | `deleteMessage(messageId)` | 削除（**Bot 自身が送った行のみ**。他人の行は 403）。削除対象の最小情報 `{ id, userId, channelId }` を返す（本文は無い） |
 
