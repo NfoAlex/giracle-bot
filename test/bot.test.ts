@@ -206,6 +206,22 @@ describe("GiracleBot", () => {
     expect(inboxes).toHaveLength(0);
   });
 
+  test("未知 signal / raw は無視する", () => {
+    const b = newBot();
+    bot = b;
+    let n = 0;
+    b.on("message", () => (n += 1));
+    b.on("messageUpdate", () => (n += 1));
+    b.on("inbox", () => (n += 1));
+    b.start();
+
+    latestMock().receive("not-json");
+    latestMock().receive(JSON.stringify({ signal: "unknown::X", data: {} }));
+    latestMock().receive(JSON.stringify({ signal: 123 }));
+
+    expect(n).toBe(0);
+  });
+
   test("sendMessage は { channelId, message, replyingMessageId } を POST する", async () => {
     const b = newBot({
       fetchImpl: (async (input: unknown, init?: RequestInit) => {
