@@ -20,7 +20,7 @@ Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /e
 
 ```ts
 const bot = new GiracleBot({
-  serverUrl: "http://localhost:3000", // 末尾スラッシュ可、http→ws は内部変換
+  serverUrl: "http://localhost:3000", // 末尾スラッシュ可、http→ws は内部変換。http(s)/ws(s) 以外は構築時 TypeError
   token: process.env.BOT_TOKEN!,      // BotManage.tokenCode。Bearer 不要、生値を Authorization に載せる
   // テスト用: fetchImpl / WebSocketImpl / pingIntervalMs / reconnectBaseMs
 });

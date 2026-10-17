@@ -31,6 +31,19 @@ function newBot(over: Partial<BotOptions> = {}): GiracleBot {
   });
 }
 
+describe("GiracleBot serverUrl 検証", () => {
+  test("scheme 無し / 非対応 scheme は構築時に throw する", () => {
+    expect(() => newBot({ serverUrl: "localhost:3000" })).toThrow();
+    expect(() => newBot({ serverUrl: "httpx://h" })).toThrow();
+  });
+
+  test("http(s) / ws(s) は受理する（大文字 scheme 含む）", () => {
+    for (const url of ["http://h", "https://h", "ws://h", "wss://h", "HTTP://h/"]) {
+      expect(() => newBot({ serverUrl: url })).not.toThrow();
+    }
+  });
+});
+
 describe("GiracleBot", () => {
   test("WS 接続先は http→ws 変換 + 末尾スラッシュ正規化で ws://…/ext/ws", () => {
     const b = new GiracleBot({

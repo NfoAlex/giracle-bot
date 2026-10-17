@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { GiracleClient } from "./client";
 import { log } from "./log";
+import { wsUrl } from "./url";
 import { GiracleSocket } from "./ws";
 import type {
   BotEventMap,
@@ -79,7 +80,7 @@ export class GiracleBot extends EventEmitter {
     log("bot を起動");
 
     this.socket = new GiracleSocket(
-      `${this.options.serverUrl.replace(/\/+$/, "").replace(/^http/, "ws")}/ext/ws`,
+      wsUrl(this.options.serverUrl),
       this.options.token,
       {
         WebSocketImpl: this.options.WebSocketImpl,

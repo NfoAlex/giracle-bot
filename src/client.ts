@@ -1,5 +1,6 @@
 import { GiracleApiError } from "./errors";
 import type { DeletedMessage, Message, MessageUpdate } from "./types";
+import { baseUrl } from "./url";
 
 /** POST で JSON を送るための共通ヘッダ */
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -21,7 +22,7 @@ export class GiracleClient {
   private fetchImpl: typeof fetch;
 
   constructor(serverUrl: string, token: string, fetchImpl?: typeof fetch) {
-    this.baseUrl = serverUrl.replace(/\/+$/, "");
+    this.baseUrl = baseUrl(serverUrl);
     this.token = token;
     this.fetchImpl = fetchImpl ?? fetch;
   }

@@ -271,4 +271,9 @@ describe("GiracleClient", () => {
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).body).toBe("unexpected response shape");
   });
+
+  test("serverUrl が不正なら構築時に throw する", () => {
+    expect(() => new GiracleClient("localhost:3000", TOKEN)).toThrow();
+    expect(() => new GiracleClient("httpx://h", TOKEN)).toThrow();
+  });
 });

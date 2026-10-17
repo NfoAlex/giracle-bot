@@ -108,6 +108,7 @@ bun run build
 
 ## 注意事項
 
+- **`serverUrl` は `http(s)` / `ws(s)` のみ。** scheme 無し（`localhost:3000`）や typo（`httpx://`）は構築時に `TypeError` で落ちる。無言で再接続を繰り返す（`error` / `close` も出ない）事故を防ぐため。テストで差し替え口が必要な場合は `fetchImpl` / `WebSocketImpl` を使う
 - **Bot 自身の送信・編集・削除は WS に流れない**（自分にも他の Bot にも届かない）。echo でもループにはならないが、Bot は「自分が送った/編集したメッセージ」を `message` / `messageUpdate` イベントからは知り得ない（`sendMessage` / `editMessage` / `deleteMessage` の戻り値で確認する）
 - ユーザー送信時、サーバーは bot 購読トピックへ **`message::UpdateMessage`** を発行する。そのため新規メッセージも「Update」という signal 名で届く（フレームワークで振り分け済み）
 - URL プレビュー生成後の更新は `bot::channel` トピックへ配信されない
