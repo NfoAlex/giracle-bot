@@ -1,5 +1,5 @@
 import { GiracleApiError } from "./errors";
-import type { Message, MessageUpdate } from "./types";
+import type { DeletedMessage, Message, MessageUpdate } from "./types";
 
 /** POST で JSON を送るための共通ヘッダ */
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -11,8 +11,7 @@ type SendResponse = {
 };
 
 /**
- * /ext API の fetch ラッパ。対応エンドポイントは
- * POST /ext/message/send と POST /ext/message/edit。
+ * /ext API の fetch ラッパ。対応エンドポイントは send / edit / delete の 3 つ。
  */
 export class GiracleClient {
   private baseUrl: string;
@@ -71,6 +70,24 @@ export class GiracleClient {
     }
 
     return res as MessageUpdate;
+  }
+
+  /**
+   * DELETE /ext/message/delete。ボディ: { messageId }。
+   * DELETE でもボディに JSON を載せる（サーバー側が body で受ける）。
+   * 削除できるのは Bot 自身が送信したメッセージのみ（他人の行は 403）。
+   * 戻りは削除対象の最小情報で、本文は含まれない。
+   */
+  async deleteMessage(messageId: string): Promise<DeletedMessage> {
+    const res = await this.call("/ext/message/delete", "DELETE", {
+      messageId,
+    });
+
+    if (!isRow(res)) {
+      throw new GiracleApiError(200, "unexpected response shape");
+    }
+
+    return res as DeletedMessage;
   }
 
   /** body 省略時は content-type を付けない */

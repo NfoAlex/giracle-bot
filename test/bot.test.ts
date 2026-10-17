@@ -215,6 +215,26 @@ describe("GiracleBot", () => {
     expect(edited.isEdited).toBeTrue();
   });
 
+  test("deleteMessage は DELETE + ボディ { messageId } で /ext/message/delete を呼ぶ", async () => {
+    const b = newBot({
+      fetchImpl: (async (input: unknown, init?: RequestInit) => {
+        expect(String(input)).toBe(`${SERVER}/ext/message/delete`);
+        expect(init?.method).toBe("DELETE");
+        expect(JSON.parse(String(init?.body))).toEqual({ messageId: "m1" });
+
+        return new Response(
+          JSON.stringify({ id: "m1", userId: "u1", channelId: "c1" }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }) as typeof fetch,
+    });
+    bot = b;
+    const deleted = await b.deleteMessage("m1");
+
+    expect(deleted.id).toBe("m1");
+    expect(deleted.channelId).toBe("c1");
+  });
+
   test("WS ERROR signal → error イベント発火", () => {
     const b = newBot();
     bot = b;

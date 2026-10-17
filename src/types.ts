@@ -3,8 +3,9 @@
  * 合わせる（過剰な型にしない）。
  *
  * Bot 関係の API 現状:
- * - HTTP は POST /ext/message/send と POST /ext/message/edit（delete / makeGet はサーバー側に存在しない）
- * - send のレスポンスは { message, data } ラッパー付き、edit は行そのもの
+ * - HTTP は POST /ext/message/send, POST /ext/message/edit, DELETE /ext/message/delete
+ *   （makeGet はサーバー側に存在しない）
+ * - send のレスポンスは { message, data } ラッパー付き、edit / delete は行そのもの
  * - WS は bot::channel::<channelId> と user::<remoteUserId> を購読し、
  *   user 送信 / 編集をともに signal "message::UpdateMessage" で受ける
  */
@@ -70,6 +71,16 @@ export type MessageUpdate = {
   userId: string;
   content: string;
   isEdited: boolean;
+};
+
+/**
+ * 削除対象の最小情報（DELETE /ext/message/delete の成功レスポンス）。
+ * 本文は返らず id / userId / channelId のみ（getSingleWithMinimum 相当）。
+ */
+export type DeletedMessage = {
+  id: string;
+  userId: string;
+  channelId: string;
 };
 
 /** inbox::Added signal の data（Bot がメンションされたとき受け取る） */

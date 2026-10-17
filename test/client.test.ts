@@ -211,4 +211,53 @@ describe("GiracleClient", () => {
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).body).toBe("unexpected response shape");
   });
+
+  test("deleteMessage 成功: DELETE + ボディ { messageId } で最小情報を返す", async () => {
+    const row = { id: "m-abc", userId: "u1", channelId: "c1" };
+    const { impl, calls } = mockFetch((url, init) => {
+      expect(url).toBe(`${SERVER}/ext/message/delete`);
+      expect(init?.method).toBe("DELETE");
+      expect(init?.headers).toEqual({
+        Authorization: TOKEN,
+        "content-type": "application/json",
+      });
+
+      return okJson(row);
+    });
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const got = await client.deleteMessage("m-abc");
+
+    expect(got).toEqual(row);
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      messageId: "m-abc",
+    });
+  });
+
+  test("deleteMessage 403 → GiracleApiError(status=403, body 保持)", async () => {
+    const { impl } = mockFetch(() => textRes(403, "You are not owner of this message"));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.deleteMessage("m1").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).status).toBe(403);
+    expect((err as GiracleApiError).body).toBe("You are not owner of this message");
+  });
+
+  test("deleteMessage 200 だが id 無し JSON → GiracleApiError", async () => {
+    const { impl } = mockFetch(() => okJson({ deleted: true }));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.deleteMessage("m1").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).body).toBe("unexpected response shape");
+  });
 });

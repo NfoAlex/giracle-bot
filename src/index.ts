@@ -3,6 +3,7 @@ export { GiracleBot } from "./bot";
 export type {
   BotEventMap,
   BotOptions,
+  DeletedMessage,
   InboxAdded,
   Message,
   MessageFile,

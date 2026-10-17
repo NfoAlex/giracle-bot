@@ -5,6 +5,7 @@ import { GiracleSocket } from "./ws";
 import type {
   BotEventMap,
   BotOptions,
+  DeletedMessage,
   InboxAdded,
   Message,
   MessageUpdate,
@@ -149,6 +150,14 @@ export class GiracleBot extends EventEmitter {
    */
   editMessage(messageId: string, message: string): Promise<MessageUpdate> {
     return this.client.editMessage(messageId, message);
+  }
+
+  /**
+   * DELETE /ext/message/delete。削除できるのは Bot 自身が送ったメッセージのみ。
+   * 関連データ（添付ファイル実体・リアクション・通知）もサーバー側で削除される。
+   */
+  deleteMessage(messageId: string): Promise<DeletedMessage> {
+    return this.client.deleteMessage(messageId);
   }
 
   private handleSignal(env: { signal: string; data: unknown }): void {
