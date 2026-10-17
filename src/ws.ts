@@ -113,7 +113,8 @@ export class GiracleSocket {
     ws.onopen = () => {
       log(this.attempt > 0 ? `再接続に成功 (attempt ${this.attempt})` : "接続確立");
 
-      this.attempt = 0;
+      // attempt はここで戻さない。open 直後に切れるサーバーだと毎回 1 秒で
+      // 再接続し続け、指数バックオフが働かない（pong 受信で健全と確認してから戻す）。
       this.lastPongAt = Date.now();
       this.startPing();
       this.onOpen?.();
@@ -146,7 +147,9 @@ export class GiracleSocket {
 
     if (env.signal === "pong") {
       // liveness の更新のみ。利用側へは流さない。
+      // 健全な接続を確認できたのでバックオフを戻す（この時点が唯一の reset 点）。
       this.lastPongAt = Date.now();
+      this.attempt = 0;
 
       return;
     }

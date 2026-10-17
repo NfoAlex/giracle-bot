@@ -73,7 +73,7 @@ Bot 用 HTTP API はこの 3 つのみ。**`getMessage`（取得）はサーバ�
 
 **Bot として送信/編集/削除したメッセージの WS 通知は来ない。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため `bot::channel::<channelId>` を購読する Bot には届かず、delete の `message::MessageDeleted` は `GLOBAL` にのみ publish される（Bot は `GLOBAL` を購読しない）。これは自分自身にも他の Bot にも同様で、`message` / `messageUpdate` は**ユーザーの**投稿・編集でしか発火しない。自分が送った行の id や内容は `sendMessage` / `editMessage` / `deleteMessage` の戻り値から取る。
 
-WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。ping は 30 秒間隔で自動送信し、`pong` が 2 周期連続で返らなければ（最終受信から `pingIntervalMs × 2` を超えた次の周期で）半死接続とみなして切断 → 再接続する。
+WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で自動再接続。バックオフは `pong` を受けて健全と確認できた接続でリセットされる（接続確立だけでは戻さない。open 直後に切れるサーバーで 1 秒再接続を繰り返さないため）。ping は 30 秒間隔で自動送信し、`pong` が 2 周期連続で返らなければ（最終受信から `pingIntervalMs × 2` を超えた次の周期で）半死接続とみなして切断 → 再接続する。
 
 ## ログ
 

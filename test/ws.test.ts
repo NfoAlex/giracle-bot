@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { GiracleSocket, nextBackoffMs, WS_OPEN } from "../src/ws";
+import { GiracleSocket, nextBackoffMs } from "../src/ws";
 import type { SignalEnvelope } from "../src/types";
 import { MockWebSocket, latestMock } from "./mockWebSocket";
 
@@ -7,6 +7,17 @@ const URL = "ws://localhost:3000/ws";
 const TOKEN = "tok-secret";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** 条件成立まで最大 timeoutMs 待つ（タイマー依存テスト用。sleep の固定待ちは環境で揺れる） */
+async function waitFor(cond: () => boolean, timeoutMs = 3_000): Promise<void> {
+  const start = Date.now();
+
+  while (!cond()) {
+    if (Date.now() - start > timeoutMs) throw new Error("waitFor timeout");
+
+    await sleep(1);
+  }
+}
 
 let sockets: GiracleSocket[] = [];
 
@@ -138,18 +149,57 @@ describe("GiracleSocket ERROR / 再接続", () => {
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 
-  test("正常な OPEN 後にバックオフ遅延はリセットされる（attempt が進んでも開通で 0 に）", async () => {
-    const s = makeSocket({ reconnectBaseMs: 10 });
-    s.start();
-    const ws0 = latestMock();
-    ws0.open();
-    ws0.serverClose();
-    await sleep(40);
+  /** 接続 → open → 即異常切断 を 1 回行い、次のソケットが現れるのを待つ */
+  async function flap(index: number): Promise<void> {
+    const ws = MockWebSocket.instances[index];
+    if (!ws) throw new Error(`no socket #${index}`);
 
-    expect(MockWebSocket.instances).toHaveLength(2);
-    const ws1 = latestMock();
-    ws1.open(); // attempt → 0
-    expect(ws1.readyState).toBe(WS_OPEN);
+    ws.open();
+    ws.serverClose();
+
+    await waitFor(() => MockWebSocket.instances.length >= index + 2);
+  }
+
+  test("open 直後の切断を繰り返すとバックオフが増加する（attempt は open で 0 に戻らない）", async () => {
+    const s = makeSocket({ reconnectBaseMs: 20 });
+    s.start();
+
+    const created: number[] = [Date.now()];
+
+    for (let i = 0; i < 3; i++) {
+      await flap(i);
+      created.push(Date.now());
+    }
+
+    const gaps = created.slice(1).map((t, i) => t - created[i]!);
+
+    // 期待 20 → 40 → 80ms。open で attempt が 0 に戻ると全部 20ms のまま増えない
+    expect(gaps[0]).toBeGreaterThanOrEqual(15);
+    expect(gaps[1]).toBeGreaterThanOrEqual(30);
+    expect(gaps[2]).toBeGreaterThanOrEqual(60);
+  });
+
+  test("pong を受けた健全な接続の次はバックオフが base に戻る", async () => {
+    const s = makeSocket({ reconnectBaseMs: 30 });
+    s.start();
+
+    // 3 回フラップして attempt を進める（遅延 30 → 60 → 120ms）
+    for (let i = 0; i < 3; i++) await flap(i);
+
+    // 4 個目で pong を返し「接続は健全」と判定させる → attempt が 0 に戻る
+    const ws = MockWebSocket.instances[3]!;
+    ws.open();
+    ws.receive(JSON.stringify({ signal: "pong", data: "pong" }));
+
+    const before = Date.now();
+    ws.serverClose();
+
+    await waitFor(() => MockWebSocket.instances.length >= 5);
+
+    const gap = Date.now() - before;
+
+    // reset されれば 30ms。pong でも reset しない過剰修正なら 30*2^3 = 240ms
+    expect(gap).toBeLessThan(90);
   });
 
   test("コンストラクタ throw は未捕捉にならず、再試行が予約される", async () => {
