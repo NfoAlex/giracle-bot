@@ -448,5 +448,20 @@ describe("GiracleBot", () => {
 
       expect(opened).toBe(2);
     });
+
+    test("once('open') は再接続しても 1 回だけ（例の重複実行防止）", async () => {
+      const b = newBot({ reconnectBaseMs: 10 });
+      bot = b;
+      let opened = 0;
+      b.once("open", () => (opened += 1));
+      b.start();
+
+      latestMock().open();
+      latestMock().serverClose();
+      await sleep(40);
+      latestMock().open();
+
+      expect(opened).toBe(1);
+    });
   });
 });

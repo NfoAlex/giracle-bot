@@ -42,6 +42,7 @@ Bot 用 HTTP API は **send / edit / delete の 3 つのみ**。メッセージ�
 | `message` | `Message` | 新規投稿（signal 名は `message::UpdateMessage`）。**Bot 自身の送信は配信されない**ため自己送信ガード不要。システムメッセージも含む |
 | `messageUpdate` | `MessageUpdate` | 編集のみ。`{ id, channelId, userId, content, isEdited: true }` の部分行 |
 | `inbox` | `{ message, type }` | Bot ユーザーがメンション（type `mention`）・返信（type `reply`）されたとき |
+| `open` | なし | WS 接続確立（初回・**再接続の毎回**）。`on` に副作用を置くと再接続で再実行されるため、一回限りの処理は `bot.once("open", …)` |
 | `error` | `Error` | WS `ERROR` signal の受信時のみ（fatal。`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` の reject なので catch する |
 | `close` | なし | `stop()` または `ERROR` signal 後 |
 

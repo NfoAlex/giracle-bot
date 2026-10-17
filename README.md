@@ -68,7 +68,8 @@ Bot 用 HTTP API はこの 3 つのみ。**`getMessage`（取得）はサーバ�
 | `message` | `Message` | 新規メッセージ（signal は `message::UpdateMessage`。全行分が流れる）。システムメッセージも流れる。**Bot として送信したメッセージは WS 配信されない**ため自己送信ガードは不要 |
 | `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み。**Bot として編集した結果も `messageUpdate` には流れない** |
 | `inbox` | `InboxAdded` | Bot がメンション・返信されたとき（`{ message, type: "mention" \| "reply" }`）。メンションはチャンネル参加者が送った場合のみ |
-| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
+| `open` | なし | WS 接続確立（初回・再接続の度に発火）。**`on` に副作用を置くと再接続の度に再実行される**ため、一回限りの処理は `bot.once("open", …)` を使う |
+| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
 | `close` | なし | `stop()` または fatal エラーによる終了 |
 
 **Bot として送信/編集/削除したメッセージの WS 通知は来ない。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため `bot::channel::<channelId>` を購読する Bot には届かず、delete の `message::MessageDeleted` は `GLOBAL` にのみ publish される（Bot は `GLOBAL` を購読しない）。これは自分自身にも他の Bot にも同様で、`message` / `messageUpdate` は**ユーザーの**投稿・編集でしか発火しない。自分が送った行の id や内容は `sendMessage` / `editMessage` / `deleteMessage` の戻り値から取る。
