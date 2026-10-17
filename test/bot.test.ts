@@ -237,6 +237,23 @@ describe("GiracleBot", () => {
     expect(got).toHaveLength(0);
   });
 
+  test("inbox は message 全行必須（id のみは捨てる）", () => {
+    const b = newBot();
+    bot = b;
+    const inboxes: unknown[] = [];
+    b.on("inbox", (i) => inboxes.push(i));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({
+        signal: "inbox::Added",
+        data: { message: { id: "m" }, type: "mention" },
+      }),
+    );
+
+    expect(inboxes).toHaveLength(0);
+  });
+
   test("sendMessage は { channelId, message, replyingMessageId } を POST する", async () => {
     const b = newBot({
       fetchImpl: (async (input: unknown, init?: RequestInit) => {

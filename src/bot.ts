@@ -192,14 +192,12 @@ export class GiracleBot extends EventEmitter {
         return;
       }
       case "inbox::Added": {
-        // メンション通知。message が行っぽく、type が文字列（InboxAdded.type の契約）のときだけ流す。
+        // メンション通知。message が全行分、type が文字列のときだけ流す。
+        // id のみの message は捨てる（channelId undefined のまま返信誤送信するため）。
         if (
           typeof env.data === "object" &&
           env.data !== null &&
-          hasStr(
-            (env.data as { message?: unknown }).message,
-            "id",
-          ) &&
+          isFullRow((env.data as { message?: unknown }).message) &&
           typeof (env.data as { type?: unknown }).type === "string"
         ) {
           this.emit("inbox", env.data as InboxAdded);
