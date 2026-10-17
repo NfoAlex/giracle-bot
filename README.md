@@ -28,7 +28,7 @@ const bot = new GiracleBot({
 
 bot.on("message", (msg) => {
   if (msg.isSystemMessage) return; // 入退室等のシステムメッセージは弾く
-  bot.sendMessage(msg.channelId, `echo: ${msg.content}`).catch(console.error);
+  bot.sendMessage({ channelId: msg.channelId, message: `echo: ${msg.content}` }).catch(console.error);
 });
 
 bot.on("inbox", (item) => {
@@ -51,9 +51,9 @@ bot.start();
 
 | メソッド | 説明 |
 | --- | --- |
-| `sendMessage(channelId, message, replyingMessageId?)` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの保存行（旧ビルドは `data.messageSaved`）をほどいて Message を返す |
-| `editMessage(messageId, message)` | 編集（**Bot 自身が送った行のみ**。他人の行は 403）。部分行 `{ id, channelId, userId, content, isEdited }` を返す（`createdAt` は無い） |
-| `deleteMessage(messageId)` | 削除（**Bot 自身が送った行のみ**。他人の行は 403）。削除対象の最小情報 `{ id, userId, channelId }` を返す（本文は無い） |
+| `sendMessage({ channelId, message, replyingMessageId? })` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの保存行（旧ビルドは `data.messageSaved`）をほどいて Message を返す |
+| `editMessage({ messageId, message })` | 編集（**Bot 自身が送った行のみ**。他人の行は 403）。部分行 `{ id, channelId, userId, content, isEdited }` を返す（`createdAt` は無い） |
+| `deleteMessage({ messageId })` | 削除（**Bot 自身が送った行のみ**。他人の行は 403）。削除対象の最小情報 `{ id, userId, channelId }` を返す（本文は無い） |
 
 Bot 用 HTTP API はこの 3 つのみ。**`getMessage`（取得）はサーバー側 `/ext` には存在しない**（通常ユーザー用の `/message` API は別に存在するが Bot は Cookie では使えない）。
 

@@ -105,7 +105,7 @@ const bot = new GiracleBot({ serverUrl: "http://localhost:3000", token: process.
 
 bot.on("message", (msg) => {
   if (msg.isSystemMessage) return;
-  bot.sendMessage(msg.channelId, `echo: ${msg.content}`).catch(console.error);
+  bot.sendMessage({ channelId: msg.channelId, message: `echo: ${msg.content}` }).catch(console.error);
 });
 
 bot.start();
@@ -113,7 +113,7 @@ bot.start();
 
 ### 2.2 機能要件
 
-1. **API クライアント** — `/ext` の 3 エンドポイントを型付きメソッドでラップ: `sendMessage`（`POST /ext/message/send`、`{ message, data }` ラッパーをほどいて `Message`）、`editMessage`（`POST /ext/message/edit`、行そのものを `MessageUpdate`）、`deleteMessage`（`DELETE /ext/message/delete`、削除対象の最小情報 `DeletedMessage`）。エラーはカスタムエラー `GiracleApiError`（`status`, `body` を保持）で送出し、文言は保持するだけで分岐に使わない。
+1. **API クライアント** — `/ext` の 3 エンドポイントを型付きメソッドでラップ: `sendMessage(params)`（`POST /ext/message/send`、`{ message, data }` ラッパーをほどいて `Message`）、`editMessage(params)`（`POST /ext/message/edit`、行そのものを `MessageUpdate`）、`deleteMessage(params)`（`DELETE /ext/message/delete`、削除対象の最小情報 `DeletedMessage`）。引数は単一オブジェクト（`SendMessageParams` / `EditMessageParams` / `DeleteMessageParams`）。エラーはカスタムエラー `GiracleApiError`（`status`, `body` を保持）で送出し、文言は保持するだけで分岐に使わない。
 2. **WS クライアント** — 自動再接続（指数バックオフ、上限 60 秒）、受信 signal の `signal`/`data` 正規化、`ping` 定期送信（30 秒間隔。pong 無応答 2 周期で半死接続とみなして再接続）。
 3. **イベント** — `message` / `messageUpdate` / `inbox` / `open` / `error` / `close`。
 4. **signal 振り分け** — `message::UpdateMessage` は `createdAt` 有無で全行分（`message` イベント）と部分行（`messageUpdate` イベント）に分ける。不正 payload（`id` 無し等）は黙って捨てる。

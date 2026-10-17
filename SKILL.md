@@ -28,9 +28,9 @@ const bot = new GiracleBot({
 bot.start();                       // WS 接続開始（戻り値なし、非同期の完了通知もない）
 bot.stop();                        // 明示停止 + close イベント
 
-await bot.sendMessage(channelId, content, replyId?);   // Message（送信結果）
-await bot.editMessage(messageId, content);             // MessageUpdate（自分の送信行のみ）
-await bot.deleteMessage(messageId);                    // DeletedMessage（自分の送信行のみ）
+await bot.sendMessage({ channelId, message: content, replyingMessageId: replyId }); // Message（送信結果）
+await bot.editMessage({ messageId, message: content });                             // MessageUpdate（自分の送信行のみ）
+await bot.deleteMessage({ messageId });                                             // DeletedMessage（自分の送信行のみ）
 ```
 
 Bot 用 HTTP API は **send / edit / delete の 3 つのみ**。メッセージ取得は `/ext` に存在しない。
@@ -69,7 +69,7 @@ bot.on("message", (msg) => {
   if (msg.isSystemMessage) return;                     // 入退室等のシステムメッセージ
 
   if (msg.content.trim() !== "!ping") return;
-  bot.sendMessage(msg.channelId, "pong").catch(report);
+  bot.sendMessage({ channelId: msg.channelId, message: "pong" }).catch(report);
 });
 
 bot.on("error", (err) => console.error("bot error:", err));
@@ -101,10 +101,10 @@ function report(err: unknown) {
 ## 4. 実装パターン
 
 - **コマンド**: `const [cmd, ...rest] = msg.content.trim().split(/\s+/);` → `switch (cmd)`。未知コマンドは無視。
-- **返信**: `bot.sendMessage(msg.channelId, body, msg.id)` で `replyingMessageId` を渡す。
+- **返信**: `bot.sendMessage({ channelId: msg.channelId, message: body, replyingMessageId: msg.id })` で渡す。
 - **メンション応答**: `inbox` イベントで `item.message` に反応する（`example/reply-bot.ts`）。
 - **編集監視**: `messageUpdate`。内容が要るなら部分行の `content` を使う（最新全体が必要ならメッセージ取得 API は Bot に無いので、WS の `message` と照合して自分で持つ）。
-- **自分の投稿を後で書き換える / 消す**: `const sent = await bot.sendMessage(c, "…"); await bot.editMessage(sent.id, "…"); await bot.deleteMessage(sent.id);`（進捗表示の更新や一時メッセージの掃除など）。
+- **自分の投稿を後で書き換える / 消す**: `const sent = await bot.sendMessage({ channelId: c, message: "…" }); await bot.editMessage({ messageId: sent.id, message: "…" }); await bot.deleteMessage({ messageId: sent.id });`（進捗表示の更新や一時メッセージの掃除など）。
 - **チャンネル別挙動**: ハンドラ内で `msg.channelId` を判定する（購読フィルタは無い）。
 
 ## 5. 検証（実機を立てる前にここまで）
