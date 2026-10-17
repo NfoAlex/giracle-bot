@@ -55,7 +55,7 @@ edit / delete は **Bot 自身（`remoteUserId`）名義のメッセージのみ
 - **`/ext` のエンドポイントは send / edit / delete のみ。** 旧仕様の `GET /ext/message/:id` / `makeGet` は廃止され、Bot のメッセージ取得はできない。
 - send のレスポンスは保存行そのもの（旧ビルドは `{ message, data: { messageSaved, messageReplyingTo } }` ラッパー付き）。edit / delete も行そのもの。エラー時はボディがテキスト（JSON ではない）。
 - **Bot の送信・編集・削除は WS へ配信されない。** send / edit は `channel::<channelId>` への publish のため Bot の購読トピック（`bot::channel::`）には届かず、delete は `GLOBAL` への publish だが Bot は `GLOBAL` を購読しない。自分の操作はどの Bot にも届かず、echo ループは原理的に発生しない。
-- Bot 送信でもメンション処理・URL プレビュー通知は走らない（ユーザー送信時のみ）。`bindUrlPreview` が付いているため URL プレビュー行自体は生成され得る。
+- Bot 送信でもメンション処理・URL プレビュー通知は走らない（ユーザー送信時のみ）。`bindUrlPreview` は付いているが、`UrlPreviewControl` はレスポンスの `data` を見るためラッパー無しの現行 `/ext` レスポンスでは早期 return し、**URL プレビュー行も生成されない**（実測: Bot 送信 0 件 / ユーザー送信 1 件）。Bot が URL プレビューを受け取ることは無い。
 - `/ext` には Bot 単位のレート制限は現状適用されていない（全体の anonymous/IP レート制限の対象外）。
 
 ### 1.3 WebSocket（`src/ws.ext.ts`）
