@@ -176,7 +176,13 @@ export class GiracleBot extends EventEmitter {
           typeof env.data === "object" &&
           env.data !== null &&
           typeof (env.data as { isEdited?: unknown }).isEdited === "boolean";
-        if (hasStr(env.data, "id") && isBoolEdited) {
+        if (
+          hasStr(env.data, "id") &&
+          hasStr(env.data, "channelId") &&
+          hasStr(env.data, "userId") &&
+          hasStr(env.data, "content") &&
+          isBoolEdited
+        ) {
           // SAFETY: 直上で id を検証済み。他フィールドは利用側の責務。
           this.emit("messageUpdate", env.data as unknown as MessageUpdate);
 

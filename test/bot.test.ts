@@ -222,6 +222,21 @@ describe("GiracleBot", () => {
     expect(n).toBe(0);
   });
 
+  test("部分行は id + isEdited のみでは発火しない", () => {
+    const b = newBot();
+    bot = b;
+    const got: unknown[] = [];
+    b.on("message", (m) => got.push(m));
+    b.on("messageUpdate", (u) => got.push(u));
+    b.start();
+
+    latestMock().receive(
+      JSON.stringify({ signal: "message::UpdateMessage", data: { id: "x", isEdited: true } }),
+    );
+
+    expect(got).toHaveLength(0);
+  });
+
   test("sendMessage は { channelId, message, replyingMessageId } を POST する", async () => {
     const b = newBot({
       fetchImpl: (async (input: unknown, init?: RequestInit) => {
