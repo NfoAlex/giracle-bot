@@ -33,10 +33,13 @@ Bot開発者                 Giracleサーバー(giracle-backend)
 | --- | --- | --- |
 | POST | `/ext/message/send` | `{ message: "Sent message", data: { messageSaved: <メッセージ行 + MessageFileAttached 配列>, messageReplyingTo: <返信先行 or null> } }` |
 | POST | `/ext/message/edit` | `{ id, channelId, userId, content, isEdited: true }`（`updateMessage` の returning。ラッパー無し・`createdAt` 無し） |
+| DELETE | `/ext/message/delete` | `{ id, userId, channelId }`（`getSingleWithMinimum` 相当の削除対象。ラッパー無し・本文無し） |
 
-リクエストボディ: send は `{ channelId: string, message: string, replyingMessageId?: string }`、edit は `{ messageId: string, message: string }`。
+リクエストボディ: send は `{ channelId: string, message: string, replyingMessageId?: string }`、edit は `{ messageId: string, message: string }`、delete は `{ messageId: string }`（**DELETE でも JSON ボディ**）。
 
-edit は **Bot 自身（`remoteUserId`）名義のメッセージのみ**編集可。同名義は WS 部分行と同じ形のため `MessageUpdate` 型を使い回す。
+edit / delete は **Bot 自身（`remoteUserId`）名義のメッセージのみ**操作可。
+- edit の戻りは WS 部分行と同じ形のため `MessageUpdate` 型を使い回す。
+- delete は本文を返さず、関連データ（添付ファイル実体・リアクション・通知）もサーバー側の 1 トランザクションで消える。
 
 エラー（文言は保持するだけで分岐に使わないこと。status code だけで判定する）:
 
@@ -44,14 +47,14 @@ edit は **Bot 自身（`remoteUserId`）名義のメッセージのみ**編集�
 | --- | --- |
 | 400 | `Bot is not enabled on this server` / `Message is empty`（空白のみ）/ `Message is too long. Maximum length is <N>` / `You are not joined this channel` / `Replying message not found` / `Message is already same`（edit で本文が不変） |
 | 401 | token 不正 / 未承認 / Bot 無効化 |
-| 403 | `You are not sender of this message`（edit で Bot 名義でない行） |
-| 404 | `Message not found`（edit で行が存在しない） |
+| 403 | `You are not sender of this message`（edit）/ `You are not owner of this message`（delete）で Bot 名義でない行 |
+| 404 | `Message not found`（edit / delete で行が存在しない） |
 
 補足:
 
-- **`/ext` のエンドポイントは send と edit のみ。** 旧仕様の `GET /ext/message/:id` / `delete` は廃止された。Bot のメッセージ取得・削除はできない。
-- send のレスポンスは通常モジュールと同じ `{ message, data }` ラッパー付き、edit は行そのもの。エラー時はボディがテキスト（JSON ではない）。
-- **Bot の送信・編集は WS へ publish されない**（`channel::<channelId>` への publish のため Bot の購読トピックには届かない）。自分の送信/編集はどの Bot にも届かない。echo ループは原理的に発生しない。
+- **`/ext` のエンドポイントは send / edit / delete のみ。** 旧仕様の `GET /ext/message/:id` / `makeGet` は廃止され、Bot のメッセージ取得はできない。
+- send のレスポンスは通常モジュールと同じ `{ message, data }` ラッパー付き、edit / delete は行そのもの。エラー時はボディがテキスト（JSON ではない）。
+- **Bot の送信・編集・削除は WS へ配信されない。** send / edit は `channel::<channelId>` への publish のため Bot の購読トピック（`bot::channel::`）には届かず、delete は `GLOBAL` への publish だが Bot は `GLOBAL` を購読しない。自分の操作はどの Bot にも届かず、echo ループは原理的に発生しない。
 - Bot 送信でもメンション処理・URL プレビュー通知は走らない（ユーザー送信時のみ）。`bindUrlPreview` が付いているため URL プレビュー行自体は生成され得る。
 - `/ext` には Bot 単位のレート制限は現状適用されていない（全体の anonymous/IP レート制限の対象外）。
 
@@ -72,7 +75,7 @@ edit は **Bot 自身（`remoteUserId`）名義のメッセージのみ**編集�
 | `ERROR` | エラー文言 | 認証失敗時 |
 
 - **新規メッセージと編集が同一 signal 名 で配信される。** 振り分けは部分行が持たない `createdAt` の有無で行う（フレームワーク実装済み）。
-- **Bot として送信/編集したメッセージはこの WS には配信されない。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため、`bot::channel::` を購読する Bot には自分も他 Bot も届かない。`message` / `messageUpdate` はユーザーの行動でしか発火しない。
+- **Bot として送信/編集/削除したメッセージはこの WS には配信されない。** send / edit は `channel::<channelId>` にのみ publish するため `bot::channel::` を購読する Bot には自分も他 Bot も届かず、delete は `GLOBAL` へ publish されるが Bot は `GLOBAL` を購読しない。`message` / `messageUpdate` はユーザーの行動でしか発火しない。
 - `message::SendMessage` は `channel::<id>`（通常ユーザー用）へのみ publish され、`bot::channel::` へは発行されない。URL プレビュー更新（`UrlPreviewControl`）、リアクション、既読時間、削除（`message::MessageDeleted` は GLOBAL へ）も Bot には届かない。
 - ペイロードは文字列 JSON（内部で JSON.stringify される）。受信側は JSON.parse を試し、失敗時は raw とする正規化を入れる（実装済み）。
 
@@ -110,7 +113,7 @@ bot.start();
 
 ### 2.2 機能要件
 
-1. **API クライアント** — `/ext` の 2 エンドポイントを型付きメソッドでラップ: `sendMessage`（`POST /ext/message/send`、`{ message, data }` ラッパーをほどいて `Message`）と `editMessage`（`POST /ext/message/edit`、行そのものを `MessageUpdate`）。エラーはカスタムエラー `GiracleApiError`（`status`, `body` を保持）で送出し、文言は保持するだけで分岐に使わない。
+1. **API クライアント** — `/ext` の 3 エンドポイントを型付きメソッドでラップ: `sendMessage`（`POST /ext/message/send`、`{ message, data }` ラッパーをほどいて `Message`）、`editMessage`（`POST /ext/message/edit`、行そのものを `MessageUpdate`）、`deleteMessage`（`DELETE /ext/message/delete`、削除対象の最小情報 `DeletedMessage`）。エラーはカスタムエラー `GiracleApiError`（`status`, `body` を保持）で送出し、文言は保持するだけで分岐に使わない。
 2. **WS クライアント** — 自動再接続（指数バックオフ、上限 60 秒）、受信 signal の `signal`/`data` 正規化、`ping` 定期送信（30 秒間隔。pong 無応答 2 周期で半死接続とみなして再接続）。
 3. **イベント** — `message` / `messageUpdate` / `inbox` / `open` / `error` / `close`。
 4. **signal 振り分け** — `message::UpdateMessage` は `createdAt` 有無で全行分（`message` イベント）と部分行（`messageUpdate` イベント）に分ける。不正 payload（`id` 無し等）は黙って捨てる。
@@ -128,7 +131,7 @@ giracle-bot/
 │   ├── errors.ts
 │   ├── log.ts
 │   └── index.ts       # エクスポート
-├── example/           # echo / reply-bot / edit-watcher / edit-bot / ping
+├── example/           # echo / reply-bot / edit-watcher / edit-bot / delete-bot / ping
 ├── test/              # bun test（モックのみで実サーバー不要）
 ├── README.md          # 利用者向け README
 └── SKILL.md           # Bot 実装エージェント向け手順書
@@ -150,6 +153,6 @@ giracle-bot/
 
 ## 3. 留意事項
 
-- 旧仕様との違い（破壊的変更）: `/ext` の delete / makeGet 廃止、レスポンスの `{ message, data }` ラッパー化、`approveStatus` 文字列 → `isApproved` boolean、WS 購読トピックの `bot::channel::` 化、新規メッセージ配信 signal の `message::UpdateMessage` 化、`Message.isBot` フィールド廃止、Bot 単位レート制限の撤廃。
+- 旧仕様との違い（破壊的変更）: `/ext` の makeGet 廃止（edit / delete は後日再追加）、レスポンスの `{ message, data }` ラッパー化、`approveStatus` 文字列 → `isApproved` boolean、WS 購読トピックの `bot::channel::` 化、新規メッセージ配信 signal の `message::UpdateMessage` 化、`Message.isBot` フィールド廃止、Bot 単位レート制限の撤廃。
 - Bot 自身の送信は WS 配信されないため、旧仕様にあった自己送信フィルタ・identity 未確定時の echo race 対策は不要（削除済み）。
 - サーバーは SQLite のため Bot が高頻度で `sendMessage` すると書き込み競合の危険がある。フレームワークは連投抑制を入れず、README に注意を書く。
