@@ -13,8 +13,8 @@ bot.once("open", async () => {
   if (!channelId) return;
 
   try {
-    const sent = await bot.sendMessage(channelId, "編集中…");
-    const edited = await bot.editMessage(sent.id, "編集後");
+    const sent = await bot.sendMessage({ channelId, message: "編集中…" });
+    const edited = await bot.editMessage({ messageId: sent.id, message: "編集後" });
     console.log("edited:", edited.id, edited.content, edited.isEdited);
   } catch (err) {
     console.error("bot error:", err);

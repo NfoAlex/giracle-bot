@@ -10,7 +10,7 @@ bot.on("message", (msg) => {
   if (msg.isSystemMessage) return;
   if (msg.content.trim() !== "/ping") return;
 
-  bot.sendMessage(msg.channelId, "pong").catch(console.error);
+  bot.sendMessage({ channelId: msg.channelId, message: "pong" }).catch(console.error);
 });
 
 bot.on("error", console.error);

@@ -267,7 +267,7 @@ describe("GiracleBot", () => {
       }) as typeof fetch,
     });
     bot = b;
-    const sent = await b.sendMessage("c1", "hi", "m9");
+    const sent = await b.sendMessage({ channelId: "c1", message: "hi", replyingMessageId: "m9" });
 
     expect(sent.id).toBe("m1");
   });
@@ -289,7 +289,7 @@ describe("GiracleBot", () => {
       }) as typeof fetch,
     });
     bot = b;
-    const edited = await b.editMessage("m1", "after");
+    const edited = await b.editMessage({ messageId: "m1", message: "after" });
 
     expect(edited.id).toBe("m1");
     expect(edited.content).toBe("after");
@@ -310,7 +310,7 @@ describe("GiracleBot", () => {
       }) as typeof fetch,
     });
     bot = b;
-    const deleted = await b.deleteMessage("m1");
+    const deleted = await b.deleteMessage({ messageId: "m1" });
 
     expect(deleted.id).toBe("m1");
     expect(deleted.channelId).toBe("c1");

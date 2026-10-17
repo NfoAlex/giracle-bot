@@ -11,7 +11,7 @@ bot.on("message", (msg) => {
   // システムメッセージ（入退室等）には応答しない
   if (msg.isSystemMessage) return;
 
-  bot.sendMessage(msg.channelId, `echo: ${msg.content}`).catch(console.error);
+  bot.sendMessage({ channelId: msg.channelId, message: `echo: ${msg.content}` }).catch(console.error);
 });
 
 bot.on("error", (err) => {

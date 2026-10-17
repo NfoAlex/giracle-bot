@@ -10,7 +10,11 @@ const bot = new GiracleBot({
 bot.on("inbox", (item) => {
   // メンションに対して返信する
   bot
-    .sendMessage(item.message.channelId, "呼んだ？", item.message.id)
+    .sendMessage({
+      channelId: item.message.channelId,
+      message: "呼んだ？",
+      replyingMessageId: item.message.id,
+    })
     .catch(console.error);
 });
 

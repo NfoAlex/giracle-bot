@@ -61,7 +61,7 @@ const opened = await new Promise<boolean>((resolve) => {
 if (!opened) fail("WS open なし");
 
 // 1. bot 送信（ラッパー解除）
-const sent = await bot.sendMessage(channelId, "bot smoke");
+const sent = await bot.sendMessage({ channelId, message: "bot smoke" });
 if (sent.id === undefined || sent.userId !== botUserId) {
   fail(`sendMessage 戻り値不正: ${JSON.stringify(sent)}`);
 }

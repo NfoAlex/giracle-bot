@@ -6,10 +6,13 @@ import { GiracleSocket } from "./ws";
 import type {
   BotEventMap,
   BotOptions,
+  DeleteMessageParams,
   DeletedMessage,
+  EditMessageParams,
   InboxAdded,
   Message,
   MessageUpdate,
+  SendMessageParams,
 } from "./types";
 
 /** 文字列フィールドの型ガード（例: hasStr(data, "id")）。フレームワークが使う列だけ検証する */
@@ -137,28 +140,24 @@ export class GiracleBot extends EventEmitter {
   }
 
   /** POST /ext/message/send。チャンネルへ参加済みである必要がある */
-  sendMessage(
-    channelId: string,
-    message: string,
-    replyingMessageId?: string,
-  ): Promise<Message> {
-    return this.client.sendMessage(channelId, message, replyingMessageId);
+  sendMessage(params: SendMessageParams): Promise<Message> {
+    return this.client.sendMessage(params);
   }
 
   /**
    * POST /ext/message/edit。編集できるのは Bot 自身が送ったメッセージのみ。
    * 自分で送信した行の id は sendMessage の戻り値から取る（Bot の送信は WS に流れない）。
    */
-  editMessage(messageId: string, message: string): Promise<MessageUpdate> {
-    return this.client.editMessage(messageId, message);
+  editMessage(params: EditMessageParams): Promise<MessageUpdate> {
+    return this.client.editMessage(params);
   }
 
   /**
    * DELETE /ext/message/delete。削除できるのは Bot 自身が送ったメッセージのみ。
    * 関連データ（添付ファイル実体・リアクション・通知）もサーバー側で削除される。
    */
-  deleteMessage(messageId: string): Promise<DeletedMessage> {
-    return this.client.deleteMessage(messageId);
+  deleteMessage(params: DeleteMessageParams): Promise<DeletedMessage> {
+    return this.client.deleteMessage(params);
   }
 
   private handleSignal(env: { signal: string; data: unknown }): void {

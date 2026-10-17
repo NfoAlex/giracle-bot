@@ -83,6 +83,24 @@ export type DeletedMessage = {
   channelId: string;
 };
 
+/** POST /ext/message/send の引数（単一オブジェクト） */
+export type SendMessageParams = {
+  channelId: string;
+  message: string;
+  replyingMessageId?: string;
+};
+
+/** POST /ext/message/edit の引数（単一オブジェクト） */
+export type EditMessageParams = {
+  messageId: string;
+  message: string;
+};
+
+/** DELETE /ext/message/delete の引数（単一オブジェクト） */
+export type DeleteMessageParams = {
+  messageId: string;
+};
+
 /** inbox::Added signal の data（Bot がメンションされたとき受け取る） */
 export type InboxAdded = {
   message: Message;

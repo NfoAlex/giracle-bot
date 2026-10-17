@@ -1,5 +1,12 @@
 import { GiracleApiError } from "./errors";
-import type { DeletedMessage, Message, MessageUpdate } from "./types";
+import type {
+  DeleteMessageParams,
+  DeletedMessage,
+  EditMessageParams,
+  Message,
+  MessageUpdate,
+  SendMessageParams,
+} from "./types";
 import { baseUrl } from "./url";
 
 /** POST で JSON を送るための共通ヘッダ */
@@ -27,16 +34,12 @@ export class GiracleClient {
     this.fetchImpl = fetchImpl ?? fetch;
   }
 
-  /** POST /ext/message/send。ボディ: { channelId, message, replyingMessageId? }（undefined は JSON 化で消える） */
-  async sendMessage(
-    channelId: string,
-    message: string,
-    replyingMessageId?: string,
-  ): Promise<Message> {
+  /** POST /ext/message/send。引数はサーバー body と同形。undefined は JSON 化で消える */
+  async sendMessage(params: SendMessageParams): Promise<Message> {
     const res: unknown = await this.call("/ext/message/send", "POST", {
-      channelId,
-      message,
-      replyingMessageId,
+      channelId: params.channelId,
+      message: params.message,
+      replyingMessageId: params.replyingMessageId,
     });
 
     // 行そのもの、または ラッパーの data.messageSaved を Message として返す。
@@ -57,13 +60,10 @@ export class GiracleClient {
    * 戻りは部分行（updatedAt 等は無い）。send と違い { message, data } ラッパーが無い。
    * 編集できるのは Bot 自身が送信したメッセージのみ（他人の行は 403）。
    */
-  async editMessage(
-    messageId: string,
-    message: string,
-  ): Promise<MessageUpdate> {
+  async editMessage(params: EditMessageParams): Promise<MessageUpdate> {
     const res = await this.call("/ext/message/edit", "POST", {
-      messageId,
-      message,
+      messageId: params.messageId,
+      message: params.message,
     });
 
     if (!isRow(res)) {
@@ -79,9 +79,9 @@ export class GiracleClient {
    * 削除できるのは Bot 自身が送信したメッセージのみ（他人の行は 403）。
    * 戻りは削除対象の最小情報で、本文は含まれない。
    */
-  async deleteMessage(messageId: string): Promise<DeletedMessage> {
+  async deleteMessage(params: DeleteMessageParams): Promise<DeletedMessage> {
     const res = await this.call("/ext/message/delete", "DELETE", {
-      messageId,
+      messageId: params.messageId,
     });
 
     if (!isRow(res)) {

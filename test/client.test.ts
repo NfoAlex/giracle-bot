@@ -48,7 +48,7 @@ describe("GiracleClient", () => {
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const got = await client.sendMessage("c1", "hi");
+    const got = await client.sendMessage({ channelId: "c1", message: "hi" });
 
     expect(got).toEqual(msg);
     expect(got.id).toBe("m-abc");
@@ -59,7 +59,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => okJson(msg));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const got = await client.sendMessage("c1", "hi");
+    const got = await client.sendMessage({ channelId: "c1", message: "hi" });
 
     expect(got).toEqual(msg);
     expect(got.id).toBe("m-raw");
@@ -71,8 +71,8 @@ describe("GiracleClient", () => {
     );
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    await client.sendMessage("c1", "hi", "m9");
-    await client.sendMessage("c1", "hi");
+    await client.sendMessage({ channelId: "c1", message: "hi", replyingMessageId: "m9" });
+    await client.sendMessage({ channelId: "c1", message: "hi" });
 
     expect(calls).toHaveLength(2);
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
@@ -98,7 +98,7 @@ describe("GiracleClient", () => {
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage("c1", "hi").then(
+    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -114,7 +114,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => textRes(400, "Bot is not enabled on this server"));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage("c1", "hi").then(
+    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -128,7 +128,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => textRes(200, "<html>oops</html>"));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage("c1", "hi").then(
+    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -142,7 +142,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => textRes(204, ""));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage("c1", "hi").then(
+    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -158,7 +158,7 @@ describe("GiracleClient", () => {
     );
     const client = new GiracleClient(`${SERVER}/`, TOKEN, impl);
 
-    await client.sendMessage("c1", "hi");
+    await client.sendMessage({ channelId: "c1", message: "hi" });
 
     expect(calls[0]?.url).toBe(`${SERVER}/ext/message/send`);
   });
@@ -167,7 +167,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => okJson({ message: "no data" }));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage("c1", "hi").then(
+    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -186,7 +186,7 @@ describe("GiracleClient", () => {
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const got = await client.editMessage("m-abc", "after");
+    const got = await client.editMessage({ messageId: "m-abc", message: "after" });
 
     expect(got).toEqual(row);
     expect(got.content).toBe("after");
@@ -200,7 +200,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => textRes(403, "You are not sender of this message"));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.editMessage("m1", "x").then(
+    const err = await client.editMessage({ messageId: "m1", message: "x" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -214,7 +214,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => okJson({ message: "ok" }));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.editMessage("m1", "x").then(
+    const err = await client.editMessage({ messageId: "m1", message: "x" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -237,7 +237,7 @@ describe("GiracleClient", () => {
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const got = await client.deleteMessage("m-abc");
+    const got = await client.deleteMessage({ messageId: "m-abc" });
 
     expect(got).toEqual(row);
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
@@ -249,7 +249,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => textRes(403, "You are not owner of this message"));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.deleteMessage("m1").then(
+    const err = await client.deleteMessage({ messageId: "m1" }).then(
       () => null,
       (e: unknown) => e,
     );
@@ -263,7 +263,7 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => okJson({ deleted: true }));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.deleteMessage("m1").then(
+    const err = await client.deleteMessage({ messageId: "m1" }).then(
       () => null,
       (e: unknown) => e,
     );

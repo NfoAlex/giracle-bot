@@ -13,8 +13,8 @@ bot.once("open", async () => {
   if (!channelId) return;
 
   try {
-    const sent = await bot.sendMessage(channelId, "この投稿はすぐ消える");
-    const deleted = await bot.deleteMessage(sent.id);
+    const sent = await bot.sendMessage({ channelId, message: "この投稿はすぐ消える" });
+    const deleted = await bot.deleteMessage({ messageId: sent.id });
     console.log("deleted:", deleted.id, deleted.channelId);
   } catch (err) {
     console.error("bot error:", err);
