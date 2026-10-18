@@ -163,7 +163,7 @@ export type BotEventMap = {
   inbox: [inbox: InboxAdded];
   /** WS 接続確立（初回・再接続の度に発火。送信可能の合図） */
   open: [];
-  /** WS ERROR signal 受信時のみ（fatal。HTTP 失敗は sendMessage の reject で通知する） */
+  /** WS ERROR signal 受信時のみ（fatal。HTTP 失敗は各メソッドの reject で通知する） */
   error: [error: Error];
   /** stop() または ERROR signal 後の終了 */
   close: [];
