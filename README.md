@@ -94,11 +94,43 @@ WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で�
 
 ## 配布（バンドル）
 
+`dist/` は実行スクリプトではなくライブラリ本体。`bun run dist/index.js` しても Bot は起動しない（export のみ）。Bot 側から import して使う。
+
 ```sh
 bun run build   # dist/index.js（単一 ESM バンドル）+ .d.ts
 ```
 
-Bundler は Bun 標準の `bun build`（`--target bun`）。npm publish する場合は `package.json` の `files` に `dist` を含めてある。
+Bundler は Bun 標準の `bun build`（`--target bun`）。`package.json` の `files` に `dist` を含めてある。
+
+### 使う手順（npm 公開）
+
+```sh
+bun run build
+npm publish   # dist + README が配布される（`files` 参照）
+```
+
+利用側:
+
+```sh
+bun add giracle-bot
+```
+
+```ts
+import { GiracleBot } from "giracle-bot";
+```
+
+### 使う手順（公開せずローカル参照）
+
+利用側の `package.json` に追加:
+
+```json
+{ "dependencies": { "giracle-bot": "file:../giracle-bot" } }
+```
+
+```sh
+bun install
+bun run bot.ts   # 上と同じ import で動く
+```
 
 ## 開発
 

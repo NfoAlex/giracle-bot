@@ -1,20 +1,21 @@
-name: giracle-bot
-description: Giracle Bot フレームワーク（Bun / src/index.ts の GiracleBot）で Bot を新規作成・修正するときの実装手順と落とし穴。新しい Bot の作成、コマンド/返信/編集監視の実装、イベントハンドラ追加、モックテストや実機確認を依頼されたときに使用する。
+---
+name: create-giracle-bot
+description: Giracle Bot フレームワーク（Bun の GiracleBot クラス）で Bot を新規作成・修正するときの実装手順と落とし穴。新しい Bot の作成、コマンド/返信/編集監視の実装、イベントハンドラ追加、モックテストや実機確認を依頼されたときに使用する。
 ---
 
 # Giracle Bot を作る
 
-Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /ext/message/send`（投稿）/ `POST /ext/message/edit`（自分の行の編集）/ `DELETE /ext/message/delete`（自分の行の削除）/ `GET /ext/user/:userId`（ユーザー情報）で HTTP を叩き、`/ext/ws` で `message::UpdateMessage` 等を受信する。**登録・承認・チャンネル参加はサーバー側の管理 API / 通常ユーザー API）で行う**（フレームワークは登録フローを持たない）。フレームワークがやるのは token 認証・受信 signal の正規化・自動再接続まで。
+Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /ext/message/send`（投稿）/ `POST /ext/message/edit`（自分の行の編集）/ `DELETE /ext/message/delete`（自分の行の削除）/ `GET /ext/user/:userId`（ユーザー情報）で HTTP を叩き、`/ext/ws` で `message::UpdateMessage` 等を受信する。**登録・承認・チャンネル参加はサーバー側の管理 API / 通常ユーザー API で行う**（フレームワークは登録フローを持たない）。フレームワークがやるのは token 認証・受信 signal の正規化・自動再接続まで。
 
 ## 0. 作業前に必ず読む
 
 | 読むもの | 得られるもの |
 | --- | --- |
-| `src/types.ts` | イベント名・ペイロード型の唯一の正。推測でイベント名を書かない |
-| `example/echo.ts` `example/reply-bot.ts` `example/edit-watcher.ts` `example/edit-bot.ts` `example/delete-bot.ts` `example/ping.ts` | 動く雛形。新規 Bot はこのどれかを土台にする |
-| `test/bot.test.ts` `test/mockWebSocket.ts` | 実サーバー無しで検証するための注入方法 |
+| `src/types.ts`（利用側ではインストール済み `giracle-bot` の型定義 + 本スキル §1 を正とする） | イベント名・ペイロード型の唯一の正。推測でイベント名を書かない |
+| `example/echo.ts` `example/reply-bot.ts` `example/edit-watcher.ts` `example/edit-bot.ts` `example/delete-bot.ts` `example/ping.ts`（フレームワーク内。利用側では §2 を雛形にする） | 動く雛形。新規 Bot はこのどれかを土台にする |
+| `test/bot.test.ts` `test/mockWebSocket.ts`（フレームワーク内。利用側では §5 の注入パターンを使う） | 実サーバー無しで検証するための注入方法 |
 
-フレームワーク自体（`src/`）は変更しない。Bot の実装は `example/` か利用側プロジェクトのエントリ 1 ファイルに閉じる。
+フレームワーク自体（`src/`）は変更しない。Bot の実装は利用側プロジェクトのエントリ 1 ファイルに閉じる（フレームワーク開発時のみ `example/`）。
 
 ## 1. API 表面（これ以上は無い）
 
@@ -122,8 +123,8 @@ bunx tsc --noEmit && bun test
 **モックでハンドラを検証**（実サーバー不要）。`fetchImpl` と `WebSocketImpl` を注入する。
 
 ```ts
-import { GiracleBot } from "../src";
-import { MockWebSocket, makeMessage } from "../test/mockWebSocket";
+import { GiracleBot } from "giracle-bot"; // フレームワーク内では "../src"
+import { MockWebSocket, makeMessage } from "../test/mockWebSocket"; // 利用側では同等のモックを用意
 
 const fetchImpl = (async (_input: unknown) =>
   new Response(JSON.stringify(makeMessage()), {
@@ -143,7 +144,7 @@ ws.receive(JSON.stringify({ signal: "message::UpdateMessage", data: makeMessage(
 
 ## 6. 完了チェックリスト
 
-- [ ] イベント名・型を `src/types.ts` と照合した
+- [ ] イベント名・型を §1 と型定義（フレームワーク内は `src/types.ts`）に照合した
 - [ ] `message` ハンドラの先頭に `isSystemMessage` ガード
 - [ ] `error` ハンドラを登録し、HTTP 例外を catch した
 - [ ] `err.status` で分岐（文言に依存していない）
