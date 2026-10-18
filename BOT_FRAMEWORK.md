@@ -34,8 +34,9 @@ Bot開発者                 Giracleサーバー(giracle-backend)
 | POST | `/ext/message/send` | 保存行そのもの（`<メッセージ行 + MessageFileAttached 配列>`）。旧ビルドは `{ message: "Sent message", data: { messageSaved: <行>, messageReplyingTo: <返信先行 or null> } }` で包む |
 | POST | `/ext/message/edit` | `{ id, channelId, userId, content, isEdited: true }`（`updateMessage` の returning。ラッパー無し・`createdAt` 無し） |
 | DELETE | `/ext/message/delete` | `{ id, userId, channelId }`（`getSingleWithMinimum` 相当の削除対象。ラッパー無し・本文無し） |
+| GET | `/ext/user/:userId` | ユーザー行そのもの + `ChannelJoin: [{ channelId }]`（**Bot が閲覧可能なチャンネルのみ**）+ `RoleLink: [{ roleId }]`（`{ roleId }` のみ）。存在しないユーザーは 404 `User not found` |
 
-リクエストボディ: send は `{ channelId: string, message: string, replyingMessageId?: string }`、edit は `{ messageId: string, message: string }`、delete は `{ messageId: string }`（**DELETE でも JSON ボディ**）。
+リクエストボディ: send は `{ channelId: string, message: string, replyingMessageId?: string }`、edit は `{ messageId: string, message: string }`、delete は `{ messageId: string }`（**DELETE でも JSON ボディ**）。getUser はボディ無し、`userId` はパスに URL エンコードして載せる。
 
 edit / delete は **Bot 自身（`remoteUserId`）名義のメッセージのみ**操作可。
 - edit の戻りは WS 部分行と同じ形のため `MessageUpdate` 型を使い回す。
@@ -48,11 +49,11 @@ edit / delete は **Bot 自身（`remoteUserId`）名義のメッセージのみ
 | 400 | `Bot is not enabled on this server` / `Message is empty`（空白のみ）/ `Message is too long. Maximum length is <N>` / `You are not joined this channel` / `Replying message not found` / `Message is already same`（edit で本文が不変） |
 | 401 | token 不正 / 未承認 / Bot 無効化 |
 | 403 | `You are not sender of this message`（edit）/ `You are not owner of this message`（delete）で Bot 名義でない行 |
-| 404 | `Message not found`（edit / delete で行が存在しない） |
+| 404 | `Message not found`（edit / delete で行が存在しない）/ `User not found`（getUser でユーザーが存在しない） |
 
 補足:
 
-- **`/ext` のエンドポイントは send / edit / delete のみ。** 旧仕様の `GET /ext/message/:id` / `makeGet` は廃止され、Bot のメッセージ取得はできない。
+- **`/ext` のエンドポイントは send / edit / delete / user の 4 つのみ。** 旧仕様の `GET /ext/message/:id` / `makeGet` は廃止され、Bot のメッセージ取得はできない。
 - send のレスポンスは保存行そのもの（旧ビルドは `{ message, data: { messageSaved, messageReplyingTo } }` ラッパー付き）。edit / delete も行そのもの。エラー時はボディがテキスト（JSON ではない）。
 - **Bot の送信・編集・削除は WS へ配信されない。** send / edit は `channel::<channelId>` への publish のため Bot の購読トピック（`bot::channel::`）には届かず、delete は `GLOBAL` への publish だが Bot は `GLOBAL` を購読しない。自分の操作はどの Bot にも届かず、echo ループは原理的に発生しない。
 - Bot 送信でもメンション処理・URL プレビュー通知は走らない（ユーザー送信時のみ）。`bindUrlPreview` は付いているが、`UrlPreviewControl` はレスポンスの `data` を見るためラッパー無しの現行 `/ext` レスポンスでは早期 return し、**URL プレビュー行も生成されない**（実測: Bot 送信 0 件 / ユーザー送信 1 件）。Bot が URL プレビューを受け取ることは無い。
@@ -113,7 +114,7 @@ bot.start();
 
 ### 2.2 機能要件
 
-1. **API クライアント** — `/ext` の 3 エンドポイントを型付きメソッドでラップ: `sendMessage(params)`（`POST /ext/message/send`、`{ message, data }` ラッパーをほどいて `Message`）、`editMessage(params)`（`POST /ext/message/edit`、行そのものを `MessageUpdate`）、`deleteMessage(params)`（`DELETE /ext/message/delete`、削除対象の最小情報 `DeletedMessage`）。引数は単一オブジェクト（`SendMessageParams` / `EditMessageParams` / `DeleteMessageParams`）。エラーはカスタムエラー `GiracleApiError`（`status`, `body` を保持）で送出し、文言は保持するだけで分岐に使わない。
+1. **API クライアント** — `/ext` の 4 エンドポイントを型付きメソッドでラップ: `sendMessage(params)`（`POST /ext/message/send`、`{ message, data }` ラッパーをほどいて `Message`）、`editMessage(params)`（`POST /ext/message/edit`、行そのものを `MessageUpdate`）、`deleteMessage(params)`（`DELETE /ext/message/delete`、削除対象の最小情報 `DeletedMessage`）、`getUser(params)`（`GET /ext/user/:userId`、ユーザー行 `User`）。引数は単一オブジェクト（`SendMessageParams` / `EditMessageParams` / `DeleteMessageParams` / `GetUserParams`）。エラーはカスタムエラー `GiracleApiError`（`status`, `body` を保持）で送出し、文言は保持するだけで分岐に使わない。
 2. **WS クライアント** — 自動再接続（指数バックオフ、上限 60 秒）、受信 signal の `signal`/`data` 正規化、`ping` 定期送信（30 秒間隔。pong 無応答 2 周期で半死接続とみなして再接続）。
 3. **イベント** — `message` / `messageUpdate` / `inbox` / `open` / `error` / `close`。
 4. **signal 振り分け** — `message::UpdateMessage` は `createdAt` 有無で全行分（`message` イベント）と部分行（`messageUpdate` イベント）に分ける。不正 payload（`id` 無し等）は黙って捨てる。

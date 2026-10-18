@@ -3,7 +3,7 @@
 Giracle サーバー向け Bot フレームワーク（Bun ランタイム用、依存ゼロ）。
 
 ```text
-Bot (Bun) ──HTTP──→ POST /ext/message/send | edit、DELETE /ext/message/delete   Authorization: <tokenCode>
+Bot (Bun) ──HTTP──→ POST /ext/message/send | edit、DELETE /ext/message/delete、GET /ext/user/:userId   Authorization: <tokenCode>
           ←─WS──── /ext/ws                                                    signal: message::UpdateMessage 等
 ```
 
@@ -54,12 +54,13 @@ bot.start();
 | `sendMessage({ channelId, message, replyingMessageId? })` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの保存行（旧ビルドは `data.messageSaved`）をほどいて Message を返す |
 | `editMessage({ messageId, message })` | 編集（**Bot 自身が送った行のみ**。他人の行は 403）。部分行 `{ id, channelId, userId, content, isEdited }` を返す（`createdAt` は無い） |
 | `deleteMessage({ messageId })` | 削除（**Bot 自身が送った行のみ**。他人の行は 403）。削除対象の最小情報 `{ id, userId, channelId }` を返す（本文は無い） |
+| `getUser({ userId })` | ユーザー情報取得。ユーザー行 + `ChannelJoin`（**Bot が閲覧可能なチャンネルのみ**）+ `RoleLink`（`{ roleId }` のみ）。存在しないユーザーは 404 |
 
-Bot 用 HTTP API はこの 3 つのみ。**`getMessage`（取得）はサーバー側 `/ext` には存在しない**（通常ユーザー用の `/message` API は別に存在するが Bot は Cookie では使えない）。
+Bot 用 HTTP API はこの 4 つのみ。**メッセージ取得はサーバー側 `/ext` には存在しない**（通常ユーザー用の `/message` API は別に存在するが Bot は Cookie では使えない）。
 
 メンションは本文に `@<userId>` を書くとサーバー側で処理される（Bot 送信からは通知されない。ユーザー送信時のみ）。
 
-エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。err ステータス: 400 `Bot is not enabled on this server` / `Message is empty` / `Message is too long. Maximum length is <N>` / `You are not joined this channel` / `Replying message not found` / `Message is already same`、401 `Invalid token` / `Bot is not approved yet` / `This bot is disabled`、403 `You are not sender of this message`（edit）/ `You are not owner of this message`（delete）、404 `Message not found`（edit / delete）。
+エラーは `GiracleApiError`（`status` / `body` を保持）。文言での分岐はしないこと（status code のみで判定）。err ステータス: 400 `Bot is not enabled on this server` / `Message is empty` / `Message is too long. Maximum length is <N>` / `You are not joined this channel` / `Replying message not found` / `Message is already same`、401 `Invalid token` / `Bot is not approved yet` / `This bot is disabled`、403 `You are not sender of this message`（edit）/ `You are not owner of this message`（delete）、404 `Message not found`（edit / delete）/ `User not found`（getUser）。
 
 ## イベント
 
@@ -69,7 +70,7 @@ Bot 用 HTTP API はこの 3 つのみ。**`getMessage`（取得）はサーバ�
 | `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み。**Bot として編集した結果も `messageUpdate` には流れない** |
 | `inbox` | `InboxAdded` | Bot がメンション・返信されたとき（`{ message, type: "mention" \| "reply" }`）。メンションはチャンネル参加者が送った場合のみ |
 | `open` | なし | WS 接続確立（初回・再接続の度に発火）。**`on` に副作用を置くと再接続の度に再実行される**ため、一回限りの処理は `bot.once("open", …)` を使う |
-| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
+| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` / `getUser` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
 | `close` | なし | `stop()` または fatal エラーによる終了 |
 
 **Bot として送信/編集/削除したメッセージの WS 通知は来ない。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため `bot::channel::<channelId>` を購読する Bot には届かず、delete の `message::MessageDeleted` は `GLOBAL` にのみ publish される（Bot は `GLOBAL` を購読しない）。これは自分自身にも他の Bot にも同様で、`message` / `messageUpdate` は**ユーザーの**投稿・編集でしか発火しない。自分が送った行の id や内容は `sendMessage` / `editMessage` / `deleteMessage` の戻り値から取る。

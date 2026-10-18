@@ -4,7 +4,7 @@ description: Giracle Bot フレームワーク（Bun / src/index.ts の GiracleB
 
 # Giracle Bot を作る
 
-Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /ext/message/send`（投稿）/ `POST /ext/message/edit`（自分の行の編集）/ `DELETE /ext/message/delete`（自分の行の削除）で HTTP を叩き、`/ext/ws` で `message::UpdateMessage` 等を受信する。**登録・承認・チャンネル参加はサーバー側の管理 API / 通常ユーザー API）で行う**（フレームワークは登録フローを持たない）。フレームワークがやるのは token 認証・受信 signal の正規化・自動再接続まで。
+Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /ext/message/send`（投稿）/ `POST /ext/message/edit`（自分の行の編集）/ `DELETE /ext/message/delete`（自分の行の削除）/ `GET /ext/user/:userId`（ユーザー情報）で HTTP を叩き、`/ext/ws` で `message::UpdateMessage` 等を受信する。**登録・承認・チャンネル参加はサーバー側の管理 API / 通常ユーザー API）で行う**（フレームワークは登録フローを持たない）。フレームワークがやるのは token 認証・受信 signal の正規化・自動再接続まで。
 
 ## 0. 作業前に必ず読む
 
@@ -31,9 +31,10 @@ bot.stop();                        // 明示停止 + close イベント
 await bot.sendMessage({ channelId, message: content, replyingMessageId: replyId }); // Message（送信結果）
 await bot.editMessage({ messageId, message: content });                             // MessageUpdate（自分の送信行のみ）
 await bot.deleteMessage({ messageId });                                             // DeletedMessage（自分の送信行のみ）
+await bot.getUser({ userId });                                                      // User（ChannelJoin は閲覧可能チャンネルのみ）
 ```
 
-Bot 用 HTTP API は **send / edit / delete の 3 つのみ**。メッセージ取得は `/ext` に存在しない。
+Bot 用 HTTP API は **send / edit / delete / getUser の 4 つのみ**。メッセージ取得は `/ext` に存在しない。
 
 イベント（`bot.on(name, handler)`）:
 
@@ -43,7 +44,7 @@ Bot 用 HTTP API は **send / edit / delete の 3 つのみ**。メッセージ�
 | `messageUpdate` | `MessageUpdate` | 編集のみ。`{ id, channelId, userId, content, isEdited: true }` の部分行 |
 | `inbox` | `{ message, type }` | Bot ユーザーがメンション（type `mention`）・返信（type `reply`）されたとき |
 | `open` | なし | WS 接続確立（初回・**再接続の毎回**）。`on` に副作用を置くと再接続で再実行されるため、一回限りの処理は `bot.once("open", …)` |
-| `error` | `Error` | WS `ERROR` signal の受信時のみ（fatal。`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` の reject なので catch する |
+| `error` | `Error` | WS `ERROR` signal の受信時のみ（fatal。`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` / `getUser` の reject なので catch する |
 | `close` | なし | `stop()` または `ERROR` signal 後 |
 
 無い機能: メッセージ取得（Bot API に無い）、リアクション、タイピング、削除の受信（Bot は `GLOBAL` を購読しないため `message::MessageDeleted` は届かない）、URL プレビューの更新配信。必要になったら「フレームワークのスコープ外」と報告する。
@@ -51,6 +52,8 @@ Bot 用 HTTP API は **send / edit / delete の 3 つのみ**。メッセージ�
 `editMessage` の制限: **Bot 自身（`remoteUserId`）名義の行のみ**。他人の行は 403、同一内容は 400、存在しない行は 404。編集対象の `messageId` は自分の `sendMessage` の戻り値から取る（自分の送信は WS に流れないため）。
 
 `deleteMessage` の制限: 同じく **Bot 自身の行のみ**（他人の行は 403、存在しない行は 404）。戻りは `{ id, userId, channelId }` で本文は無い。添付ファイル実体・リアクション・通知もサーバー側で消える。
+
+`getUser` の制限: 存在しないユーザーは 404（`User not found`）。戻る `ChannelJoin` は**Bot が閲覧可能なチャンネルに絞られる**（送信可否の判定には使えない。送信には Bot ユーザー自身の参加が必要）。`RoleLink` は `{ roleId }` のみでロール名・権限は付かない。
 
 **Bot として送信/編集/削除したメッセージの WS 通知は来ない。** send / edit は `channel::<channelId>` にのみ publish するため、Bot が購読する `bot::channel::<channelId>` には自分も他 Bot も届かず、delete の `message::MessageDeleted` は `GLOBAL` にのみ publish される（Bot は購読しない）。`message` / `messageUpdate` が発火するのは**ユーザー**の投稿・編集時だけ。送信・編集・削除の結果は HTTP の戻り値で受ける。
 
@@ -105,6 +108,7 @@ function report(err: unknown) {
 - **メンション応答**: `inbox` イベントで `item.message` に反応する（`example/reply-bot.ts`）。
 - **編集監視**: `messageUpdate`。内容が要るなら部分行の `content` を使う（最新全体が必要ならメッセージ取得 API は Bot に無いので、WS の `message` と照合して自分で持つ）。
 - **自分の投稿を後で書き換える / 消す**: `const sent = await bot.sendMessage({ channelId: c, message: "…" }); await bot.editMessage({ messageId: sent.id, message: "…" }); await bot.deleteMessage({ messageId: sent.id });`（進捗表示の更新や一時メッセージの掃除など）。
+- **ユーザー情報**: `const user = await bot.getUser({ userId });`。`user.ChannelJoin` は Bot が閲覧可能なチャンネル、`user.RoleLink` は `{ roleId }` のみ。論理削除・BAN 済みでも行があれば返るので必要なら `isDeleted` / `isBanned` を見る。
 - **チャンネル別挙動**: ハンドラ内で `msg.channelId` を判定する（購読フィルタは無い）。
 
 ## 5. 検証（実機を立てる前にここまで）
