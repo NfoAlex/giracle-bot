@@ -9,10 +9,12 @@ import type {
   DeleteMessageParams,
   DeletedMessage,
   EditMessageParams,
+  GetUserParams,
   InboxAdded,
   Message,
   MessageUpdate,
   SendMessageParams,
+  User,
 } from "./types";
 
 /** 文字列フィールドの型ガード（例: hasStr(data, "id")）。フレームワークが使う列だけ検証する */
@@ -158,6 +160,14 @@ export class GiracleBot extends EventEmitter {
    */
   deleteMessage(params: DeleteMessageParams): Promise<DeletedMessage> {
     return this.client.deleteMessage(params);
+  }
+
+  /**
+   * GET /ext/user/:userId。ユーザー行を返す。
+   * ChannelJoin は Bot が閲覧できるチャンネルに絞られる（閲覧可能判定に使える。送信可否は別）。
+   */
+  getUser(params: GetUserParams): Promise<User> {
+    return this.client.getUser(params);
   }
 
   private handleSignal(env: { signal: string; data: unknown }): void {

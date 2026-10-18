@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { GiracleBot } from "../src/bot";
 import type { BotOptions } from "../src/types";
-import { makeMessage, makeUpdate, MockWebSocket, latestMock } from "./mockWebSocket";
+import { makeMessage, makeUpdate, makeUser, MockWebSocket, latestMock } from "./mockWebSocket";
 
 const SERVER = "http://localhost:3000";
 const TOKEN = "tok-1";
@@ -314,6 +314,25 @@ describe("GiracleBot", () => {
 
     expect(deleted.id).toBe("m1");
     expect(deleted.channelId).toBe("c1");
+  });
+
+  test("getUser は GET /ext/user/:userId を呼ぶ", async () => {
+    const b = newBot({
+      fetchImpl: (async (input: unknown, init?: RequestInit) => {
+        expect(String(input)).toBe(`${SERVER}/ext/user/TESTUSER`);
+        expect(init?.method).toBe("GET");
+
+        return new Response(
+          JSON.stringify(makeUser({ id: "TESTUSER", name: "testsystemuser", ChannelJoin: [{ channelId: "TESTCHANNEL1" }] })),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }) as typeof fetch,
+    });
+    bot = b;
+    const user = await b.getUser({ userId: "TESTUSER" });
+
+    expect(user.id).toBe("TESTUSER");
+    expect(user.ChannelJoin).toEqual([{ channelId: "TESTCHANNEL1" }]);
   });
 
   test("WS ERROR signal → error イベント発火", () => {

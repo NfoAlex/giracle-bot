@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { GiracleClient } from "../src/client";
 import { GiracleApiError } from "../src/errors";
-import { makeMessage, makeUpdate } from "./mockWebSocket";
+import type { User } from "../src/types";
+import { makeMessage, makeUpdate, makeUser } from "./mockWebSocket";
 
 /** 呼び出し記録付きの fetch モック。Response は Bun/undici の実物を使う（サーバーは立てない）。 */
 function mockFetch(handler: (url: string, init?: RequestInit) => Response): {
@@ -264,6 +265,98 @@ describe("GiracleClient", () => {
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
     const err = await client.deleteMessage({ messageId: "m1" }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).body).toBe("unexpected response shape");
+  });
+
+  test("getUser 成功: GET /ext/user/:userId、Authorization のみでユーザー行を返す", async () => {
+    const user = makeUser({
+      id: "TESTUSER",
+      name: "testsystemuser",
+      ChannelJoin: [{ channelId: "c1" }],
+      RoleLink: [{ roleId: "r1" }],
+    });
+    const { impl, calls } = mockFetch((url, init) => {
+      expect(url).toBe(`${SERVER}/ext/user/TESTUSER`);
+      expect(init?.method).toBe("GET");
+      // body 無しなので content-type は載らない
+      expect(init?.headers).toEqual({ Authorization: TOKEN });
+
+      return okJson(user);
+    });
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const got = await client.getUser({ userId: "TESTUSER" });
+
+    expect(got).toEqual(user);
+    expect(got.ChannelJoin).toEqual([{ channelId: "c1" }]);
+    expect(calls[0]?.init?.body).toBeUndefined();
+  });
+
+  test("getUser の userId は URL エンコードされる", async () => {
+    const { impl, calls } = mockFetch(() => okJson(makeUser()));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    await client.getUser({ userId: "a/b c" });
+
+    expect(calls[0]?.url).toBe(`${SERVER}/ext/user/a%2Fb%20c`);
+  });
+
+  test("getUser 404 → GiracleApiError(status=404, body 保持)", async () => {
+    const { impl } = mockFetch(() => textRes(404, "User not found"));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.getUser({ userId: "NOTEXIST" }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).status).toBe(404);
+    expect((err as GiracleApiError).body).toBe("User not found");
+  });
+
+  test("getUser 200 だが User の列が欠けた JSON → GiracleApiError", async () => {
+    // 例: バックエンドが createdAt を created_at に改名した
+    const { impl } = mockFetch(() => okJson({ id: "u1", name: "user1" }));
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.getUser({ userId: "u1" }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).status).toBe(200);
+    expect((err as GiracleApiError).body).toBe("unexpected response shape");
+  });
+
+  test("getUser 200 だが ChannelJoin 要素の channelId が文字列でない → GiracleApiError", async () => {
+    const { impl } = mockFetch(() =>
+      okJson(makeUser({ ChannelJoin: [{ channelId: 1 }] as unknown as User["ChannelJoin"] })),
+    );
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.getUser({ userId: "u1" }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(GiracleApiError);
+    expect((err as GiracleApiError).body).toBe("unexpected response shape");
+  });
+
+  test("getUser 200 だが ChannelJoin が配列でない → GiracleApiError", async () => {
+    const { impl } = mockFetch(() =>
+      okJson(makeUser({ ChannelJoin: null as unknown as User["ChannelJoin"] })),
+    );
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.getUser({ userId: "u1" }).then(
       () => null,
       (e: unknown) => e,
     );

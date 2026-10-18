@@ -1,4 +1,4 @@
-import type { Message } from "../src/types";
+import type { Message, User } from "../src/types";
 import type { CloseInfo, SocketLike } from "../src/ws";
 
 /** 実サーバー・ネットワークを使わず WS を差し替える Mock。 */
@@ -67,6 +67,22 @@ export function makeMessage(over: Partial<Message> = {}): Message {
     isEdited: false,
     createdAt: "2024-01-01T00:00:00.000Z",
     MessageFileAttached: [],
+    ...over,
+  };
+}
+
+/** ユーザー行（GET /ext/user/:userId の応答） */
+export function makeUser(over: Partial<User> = {}): User {
+  return {
+    id: "u1",
+    name: "user1",
+    selfIntroduction: "",
+    isBanned: false,
+    isBot: false,
+    isDeleted: false,
+    createdAt: "2024-01-01T00:00:00.000Z",
+    ChannelJoin: [],
+    RoleLink: [],
     ...over,
   };
 }

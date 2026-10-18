@@ -3,8 +3,8 @@
  * 合わせる（過剰な型にしない）。
  *
  * Bot 関係の API 現状:
- * - HTTP は POST /ext/message/send, POST /ext/message/edit, DELETE /ext/message/delete
- *   （makeGet はサーバー側に存在しない）
+ * - HTTP は POST /ext/message/send, POST /ext/message/edit, DELETE /ext/message/delete,
+ *   GET /ext/user/:userId（makeGet はサーバー側に存在しない）
  * - send のレスポンスは保存行そのもの（旧ビルドは { message, data } ラッパー付き）、edit / delete も行そのもの
  * - WS は bot::channel::<channelId> と user::<remoteUserId> を購読し、
  *   user 送信 / 編集をともに signal "message::UpdateMessage" で受ける
@@ -83,6 +83,24 @@ export type DeletedMessage = {
   channelId: string;
 };
 
+/**
+ * ユーザー行（GET /ext/user/:userId の成功レスポンス）。
+ * ChannelJoin は Bot が閲覧可能なチャンネルのみ、RoleLink は { roleId } のみ付く。
+ * 論理削除・BAN 済みでも行が残っていれば返る（isDeleted / isBanned で判定する）。
+ */
+export type User = {
+  id: string;
+  name: string | null;
+  selfIntroduction: string;
+  isBanned: boolean;
+  isBot: boolean;
+  isDeleted: boolean;
+  /** ISO 8601 */
+  createdAt: string;
+  ChannelJoin: Array<{ channelId: string }>;
+  RoleLink: Array<{ roleId: string }>;
+};
+
 /** POST /ext/message/send の引数（単一オブジェクト） */
 export type SendMessageParams = {
   channelId: string;
@@ -99,6 +117,11 @@ export type EditMessageParams = {
 /** DELETE /ext/message/delete の引数（単一オブジェクト） */
 export type DeleteMessageParams = {
   messageId: string;
+};
+
+/** GET /ext/user/:userId の引数（単一オブジェクト） */
+export type GetUserParams = {
+  userId: string;
 };
 
 /** inbox::Added signal の data（Bot がメンションされたとき受け取る） */

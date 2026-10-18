@@ -3,9 +3,11 @@ import type {
   DeleteMessageParams,
   DeletedMessage,
   EditMessageParams,
+  GetUserParams,
   Message,
   MessageUpdate,
   SendMessageParams,
+  User,
 } from "./types";
 import { baseUrl } from "./url";
 
@@ -21,7 +23,7 @@ type SendResponse = {
 };
 
 /**
- * /ext API の fetch ラッパ。対応エンドポイントは send / edit / delete の 3 つ。
+ * /ext API の fetch ラッパ。対応エンドポイントは send / edit / delete / user の 4 つ。
  */
 export class GiracleClient {
   private baseUrl: string;
@@ -91,6 +93,24 @@ export class GiracleClient {
     return res as DeletedMessage;
   }
 
+  /**
+   * GET /ext/user/:userId。戻りはユーザー行そのもの。
+   * ChannelJoin は Bot が閲覧できるチャンネルに絞られ、RoleLink は id のみ。
+   * 存在しないユーザーは 404（`User not found`）。
+   */
+  async getUser(params: GetUserParams): Promise<User> {
+    const res = await this.call(
+      `/ext/user/${encodeURIComponent(params.userId)}`,
+      "GET",
+    );
+
+    if (!isUser(res)) {
+      throw new GiracleApiError(200, "unexpected response shape");
+    }
+
+    return res;
+  }
+
   /** body 省略時は content-type を付けない */
   private async call(
     path: string,
@@ -138,5 +158,41 @@ function isRow(data: unknown): data is Record<string, unknown> {
     typeof data === "object" &&
     data !== null &&
     typeof (data as Record<string, unknown>).id === "string"
+  );
+}
+
+/**
+ * User 型に書いた列をすべて実行時に検証する。バックエンドの列改名/削除で
+ * 型が嘘になり undefined が黙って利用側へ流れるのを防ぐ（未知列の追加は無視）。
+ */
+function isUser(data: unknown): data is User {
+  const u = asRecord(data);
+
+  if (!u) return false;
+
+  return (
+    typeof u.id === "string" &&
+    (typeof u.name === "string" || u.name === null) &&
+    typeof u.selfIntroduction === "string" &&
+    typeof u.isBanned === "boolean" &&
+    typeof u.isBot === "boolean" &&
+    typeof u.isDeleted === "boolean" &&
+    typeof u.createdAt === "string" &&
+    allHaveStr(u.ChannelJoin, "channelId") &&
+    allHaveStr(u.RoleLink, "roleId")
+  );
+}
+
+function asRecord(data: unknown): Record<string, unknown> | null {
+  if (typeof data !== "object" || data === null) return null;
+
+  return data as Record<string, unknown>;
+}
+
+/** 配列で、全要素が文字列フィールド key を持つか */
+function allHaveStr(data: unknown, key: string): boolean {
+  return (
+    Array.isArray(data) &&
+    data.every((v) => typeof asRecord(v)?.[key] === "string")
   );
 }

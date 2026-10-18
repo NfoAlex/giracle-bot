@@ -6,6 +6,7 @@ export type {
   DeleteMessageParams,
   DeletedMessage,
   EditMessageParams,
+  GetUserParams,
   InboxAdded,
   Message,
   MessageFile,
@@ -13,4 +14,5 @@ export type {
   MessageUrlPreview,
   SendMessageParams,
   SignalEnvelope,
+  User,
 } from "./types";
