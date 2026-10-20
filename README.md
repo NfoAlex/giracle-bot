@@ -106,6 +106,8 @@ Bundler は Bun 標準の `bun build`（`--target bun`）。
 
 ### 使う手順（ローカル参照）
 
+Bot プロジェクトはこのリポジトリの**外**（兄弟ディレクトリ）に作る。`file:` は依存先ディレクトリを丸ごとコピーするため、内側に置くと `node_modules/giracle-bot/<自分のプロジェクト>/...` と自己増殖し、`bun install` が終わらない。
+
 利用側の `package.json` に追加:
 
 ```json
@@ -122,9 +124,10 @@ bun run bot.ts   # 上と同じ import で動く
 ## LLM で Bot を作る
 
 1. フレームワークをビルド: `bun run build`
-2. Bot プロジェクトを作り、ローカル参照で入れる:
+2. Bot プロジェクトをこのリポジトリの外（兄弟）に作り、ローカル参照で入れる:
 
 ```sh
+cd ..           # giracle-bot の外へ
 mkdir my-bot && cd my-bot
 bun init -y
 bun add file:../giracle-bot
