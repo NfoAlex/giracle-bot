@@ -2,6 +2,8 @@
 
 Giracle サーバー向け Bot フレームワーク（Bun ランタイム用、依存ゼロ）。
 
+このリポジトリはライブラリ。Bot 本体は別プロジェクトで動かし、既にホストされている Giracle インスタンスへ接続する。
+
 ```text
 Bot (Bun) ──HTTP──→ POST /ext/message/send | edit、DELETE /ext/message/delete、GET /ext/user/:userId   Authorization: <tokenCode>
           ←─WS──── /ext/ws                                                    signal: message::UpdateMessage 等
@@ -92,7 +94,7 @@ WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で�
 [giracle-bot] bot を停止
 ```
 
-## 配布（バンドル）
+## ビルドと組み込み
 
 `dist/` は実行スクリプトではなくライブラリ本体。`bun run dist/index.js` しても Bot は起動しない（export のみ）。Bot 側から import して使う。
 
@@ -100,26 +102,9 @@ WS は異常切断時に 1 秒から指数バックオフ（上限 60 秒）で�
 bun run build   # dist/index.js（単一 ESM バンドル）+ .d.ts
 ```
 
-Bundler は Bun 標準の `bun build`（`--target bun`）。`package.json` の `files` に `dist` を含めてある。
+Bundler は Bun 標準の `bun build`（`--target bun`）。
 
-### 使う手順（npm 公開）
-
-```sh
-bun run build
-npm publish   # dist + README が配布される（`files` 参照）
-```
-
-利用側:
-
-```sh
-bun add giracle-bot
-```
-
-```ts
-import { GiracleBot } from "giracle-bot";
-```
-
-### 使う手順（公開せずローカル参照）
+### 使う手順（ローカル参照）
 
 利用側の `package.json` に追加:
 
@@ -131,6 +116,39 @@ import { GiracleBot } from "giracle-bot";
 bun install
 bun run bot.ts   # 上と同じ import で動く
 ```
+
+フレームワークを変更したら `bun run build` → 利用側で `bun install --force`（`file:` 参照は `dist/` の成果物を見るため）。
+
+## LLM で Bot を作る
+
+1. フレームワークをビルド: `bun run build`
+2. Bot プロジェクトを作り、ローカル参照で入れる:
+
+```sh
+mkdir my-bot && cd my-bot
+bun init -y
+bun add file:../giracle-bot
+```
+
+3. エージェント用スキルを置く（API 表面・落とし穴・モック検証手順が入っている）。中身は 1 ファイルなので、使用しているハーネスのスキル／指示ディレクトリに配置する:
+
+```sh
+cp ../giracle-bot/skills/create-giracle-bot/SKILL.md <使用しているハーネスのスキルディレクトリ>/
+```
+
+配置先はハーネス依存（プロジェクト内に置けるならプロジェクト側、無理ならグローバル側）。スキル機構が無いハーネスなら、手順 4 でこのファイルを読ませるだけでよい。
+
+4. エージェントに依頼: 「create-giracle-bot スキルを読んで `bot.ts` を実装して」。雛形はスキル §2、型の正は `node_modules/giracle-bot/dist/index.d.ts`。
+5. 検証（実機の前にモックで）:
+
+```sh
+bunx tsc --noEmit
+bun test        # スキル §5 の注入パターンでハンドラを検証
+```
+
+6. 実行: `SERVER_URL=https://<ホスト済み Giracle> BOT_TOKEN=<tokenCode> bun run bot.ts`
+
+`tokenCode` は管理者から受け取る（`PUT /bot`）。接続先は自分で立てたサーバーでも既存インスタンスでも同じ。
 
 ## 開発
 
