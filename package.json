@@ -10,7 +10,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target bun --minify && bunx tsc -p tsconfig.build.json",
     "pack": "bun run build && bun pm pack",
