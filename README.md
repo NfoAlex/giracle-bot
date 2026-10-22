@@ -30,7 +30,9 @@ const bot = new GiracleBot({
 
 bot.on("message", (msg) => {
   if (msg.isSystemMessage) return; // 入退室等のシステムメッセージは弾く
-  bot.sendMessage({ channelId: msg.channelId, message: `echo: ${msg.content}` }).catch(console.error);
+  bot
+    .sendMessage({ channelId: msg.channelId, message: `echo: ${msg.content}` })
+    .catch(console.error);
 });
 
 bot.on("inbox", (item) => {
@@ -51,12 +53,12 @@ bot.start();
 
 ## API
 
-| メソッド | 説明 |
-| --- | --- |
-| `sendMessage({ channelId, message, replyingMessageId? })` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの保存行（旧ビルドは `data.messageSaved`）をほどいて Message を返す |
-| `editMessage({ messageId, message })` | 編集（**Bot 自身が送った行のみ**。他人の行は 403）。部分行 `{ id, channelId, userId, content, isEdited }` を返す（`createdAt` は無い） |
-| `deleteMessage({ messageId })` | 削除（**Bot 自身が送った行のみ**。他人の行は 403）。削除対象の最小情報 `{ id, userId, channelId }` を返す（本文は無い） |
-| `getUser({ userId })` | ユーザー情報取得。ユーザー行 + `ChannelJoin`（**Bot が閲覧可能なチャンネルのみ**）+ `RoleLink`（`{ roleId }` のみ）。存在しないユーザーは 404 |
+| メソッド                                                  | 説明                                                                                                                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sendMessage({ channelId, message, replyingMessageId? })` | 送信（Bot ユーザーがそのチャンネルに参加している必要あり）。レスポンスの保存行（旧ビルドは `data.messageSaved`）をほどいて Message を返す     |
+| `editMessage({ messageId, message })`                     | 編集（**Bot 自身が送った行のみ**。他人の行は 403）。部分行 `{ id, channelId, userId, content, isEdited }` を返す（`createdAt` は無い）        |
+| `deleteMessage({ messageId })`                            | 削除（**Bot 自身が送った行のみ**。他人の行は 403）。削除対象の最小情報 `{ id, userId, channelId }` を返す（本文は無い）                       |
+| `getUser({ userId })`                                     | ユーザー情報取得。ユーザー行 + `ChannelJoin`（**Bot が閲覧可能なチャンネルのみ**）+ `RoleLink`（`{ roleId }` のみ）。存在しないユーザーは 404 |
 
 Bot 用 HTTP API はこの 4 つのみ。**メッセージ取得はサーバー側 `/ext` には存在しない**（通常ユーザー用の `/message` API は別に存在するが Bot は Cookie では使えない）。
 
@@ -66,14 +68,14 @@ Bot 用 HTTP API はこの 4 つのみ。**メッセージ取得はサーバー�
 
 ## イベント
 
-| イベント | ペイロード | 説明 |
-| --- | --- | --- |
-| `message` | `Message` | 新規メッセージ（signal は `message::UpdateMessage`。全行分が流れる）。システムメッセージも流れる。**Bot として送信したメッセージは WS 配信されない**ため自己送信ガードは不要 |
-| `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み。**Bot として編集した結果も `messageUpdate` には流れない** |
-| `inbox` | `InboxAdded` | Bot がメンション・返信されたとき（`{ message, type: "mention" \| "reply" }`）。メンションはチャンネル参加者が送った場合のみ |
-| `open` | なし | WS 接続確立（初回・再接続の度に発火）。**`on` に副作用を置くと再接続の度に再実行される**ため、一回限りの処理は `bot.once("open", …)` を使う |
-| `error` | `Error` | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` / `getUser` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
-| `close` | なし | `stop()` または fatal エラーによる終了 |
+| イベント        | ペイロード      | 説明                                                                                                                                                                                                                                                                                      |
+| --------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `message`       | `Message`       | 新規メッセージ（signal は `message::UpdateMessage`。全行分が流れる）。システムメッセージも流れる。**Bot として送信したメッセージは WS 配信されない**ため自己送信ガードは不要                                                                                                              |
+| `messageUpdate` | `MessageUpdate` | 編集（部分行 `{ id, channelId, userId, content, isEdited: true }`）。新規メッセージと同一 signal がフレームワーク側で振り分け済み。**Bot として編集した結果も `messageUpdate` には流れない**                                                                                              |
+| `inbox`         | `InboxAdded`    | Bot がメンション・返信されたとき（`{ message, type: "mention" \| "reply" }`）。メンションはチャンネル参加者が送った場合のみ                                                                                                                                                               |
+| `open`          | なし            | WS 接続確立（初回・再接続の度に発火）。**`on` に副作用を置くと再接続の度に再実行される**ため、一回限りの処理は `bot.once("open", …)` を使う                                                                                                                                               |
+| `error`         | `Error`         | WS の `ERROR` signal（トークン無効・未承認・無効化）受信時のみ。fatal で再接続しない（`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` / `getUser` の reject で通知される。リスナー未登録時は `console.error` にフォールバック（プロセスは落とさない） |
+| `close`         | なし            | `stop()` または fatal エラーによる終了                                                                                                                                                                                                                                                    |
 
 **Bot として送信/編集/削除したメッセージの WS 通知は来ない。** `/ext` の send / edit は `channel::<channelId>` にのみ publish するため `bot::channel::<channelId>` を購読する Bot には届かず、delete の `message::MessageDeleted` は `GLOBAL` にのみ publish される（Bot は `GLOBAL` を購読しない）。これは自分自身にも他の Bot にも同様で、`message` / `messageUpdate` は**ユーザーの**投稿・編集でしか発火しない。自分が送った行の id や内容は `sendMessage` / `editMessage` / `deleteMessage` の戻り値から取る。
 
@@ -106,48 +108,86 @@ Bundler は Bun 標準の `bun build`（`--target bun`）。
 
 ### 使う手順（ローカル参照）
 
-Bot プロジェクトはこのリポジトリの**外**（兄弟ディレクトリ）に作る。`file:` は依存先ディレクトリを丸ごとコピーするため、内側に置くと `node_modules/giracle-bot/<自分のプロジェクト>/...` と自己増殖し、`bun install` が終わらない。
+Bot プロジェクトはこのリポジトリの**外**（兄弟ディレクトリ）に作る。利用側に渡すのは `dist/` だけで足りるが、`file:` でディレクトリを指定すると**リポジトリ丸ごと**（`src/`・`test/`・`.git/`）がコピーされる。内側に置けば自分自身をコピーして `bun install` が終わらなくなる。そこで `bun pm pack` の tarball を使う。`package.json` の `files` により中身は `dist/` + `README.md` のみ（約 12KB）になる。
 
-利用側の `package.json` に追加:
+1. Bot プロジェクトをこのリポジトリの外に作る。`package.json` が無いと依存を追加できない。
 
-```json
-{ "dependencies": { "giracle-bot": "file:../giracle-bot" } }
-```
+   ```sh
+   cd ..
+   mkdir my-bot && cd my-bot
+   bun init -y
+   ```
 
-```sh
-bun install
-bun run bot.ts   # 上と同じ import で動く
-```
+2. giracle-bot 側でビルドして tarball にし、利用側へ入れる。ビルドと pack は `bun run pack` にまとめてある（tarball は pack した時点の `dist/` を固めるので、ビルドを飛ばすと古い実装が入る）。`pack:install` はこの 2 つを順に実行し、失敗した時点で停止する。
 
-フレームワークを変更したら `bun run build` → 利用側で `bun install --force`（`file:` 参照は `dist/` の成果物を見るため）。
+   ```sh
+   bun run pack:install ../my-bot
+   ```
+
+   ```text
+   bun run pack     # ビルドして dist/ だけを giracle-bot-<version>.tgz に固める
+   bun add file:<tgz の絶対パス> --cwd <対象プロジェクト>   # 利用側の package.json に記録する
+   ```
+
+   引数なしで実行すると `usage: bun run pack:install <bot project dir>` を出して exit 1。手で同じことをするなら:
+
+   ```sh
+   bun run pack           # build + pack -> giracle-bot-0.2.0.tgz
+   bun add file:../giracle-bot/giracle-bot-0.2.0.tgz --cwd ../my-bot
+   ```
+
+   利用側の `package.json` には次が入る:
+
+   ```json
+   {
+     "dependencies": {
+       "giracle-bot": "file:../giracle-bot/giracle-bot-0.2.0.tgz"
+     }
+   }
+   ```
+
+3. `bun run bot.ts` で起動する。パッケージの中身がリポジトリから `dist/` に変わっても、import は `giracle-bot` のままで呼び出し側は変わらない。
+
+補足:
+
+- フレームワークを変更したら手順 2 を再実行する。tarball はその時点のスナップショットなので、pack し直さない限り利用側は古い実装のまま動く
+- tarball はリポジトリ直下の `giracle-bot-<version>.tgz` に残る（`.gitignore` 済み）。バージョンを上げると別名になる
+- 利用側の `package.json` には tarball の**絶対パス**が記録される。ローカル検証用で、他マシンへは持ち出さない
+- ビルドを挟まずリポジトリ全体を参照したいときだけ `bun link` を使う（シンボリックリンクなのでビルド不要。ただし `src/` まで見える）
 
 ## LLM で Bot を作る
 
-1. フレームワークをビルド: `bun run build`
-2. Bot プロジェクトをこのリポジトリの外（兄弟）に作り、ローカル参照で入れる:
+1. Bot プロジェクトをこのリポジトリの外（兄弟）に作る。
 
-```sh
-cd ..           # giracle-bot の外へ
-mkdir my-bot && cd my-bot
-bun init -y
-bun add file:../giracle-bot
-```
+   ```sh
+   cd ..           # giracle-bot の外へ
+   mkdir my-bot && cd my-bot
+   bun init -y
+   ```
 
-3. エージェント用スキルを置く（API 表面・落とし穴・モック検証手順が入っている）。中身は 1 ファイルなので、使用しているハーネスのスキル／指示ディレクトリに配置する:
+2. giracle-bot 側から、ビルド済み tarball を入れる。中身は `dist/` だけなので、エージェントはこの型定義に合わせて実装する。
 
-```sh
-cp ../giracle-bot/skills/create-giracle-bot/SKILL.md <使用しているハーネスのスキルディレクトリ>/
-```
+   ```sh
+   cd ../giracle-bot
+   bun run pack:install ../my-bot
+   ```
 
-配置先はハーネス依存（プロジェクト内に置けるならプロジェクト側、無理ならグローバル側）。スキル機構が無いハーネスなら、手順 4 でこのファイルを読ませるだけでよい。
+3. エージェント用スキルを置く（API 表面・落とし穴・モック検証手順が入っている）。中身は 1 ファイル。
+
+   ```sh
+   cp ../giracle-bot/skills/create-giracle-bot/SKILL.md <使用しているハーネスのスキルディレクトリ>/
+   ```
+
+   配置先はハーネス依存（プロジェクト内に置けるならプロジェクト側、無理ならグローバル側）。スキル機構が無いハーネスなら、次の手順でこのファイルを読ませるだけでよい。
 
 4. エージェントに依頼: 「create-giracle-bot スキルを読んで `bot.ts` を実装して」。雛形はスキル §2、型の正は `node_modules/giracle-bot/dist/index.d.ts`。
-5. 検証（実機の前にモックで）:
 
-```sh
-bunx tsc --noEmit
-bun test        # スキル §5 の注入パターンでハンドラを検証
-```
+5. 検証する（実機の前にモックで）。
+
+   ```sh
+   bunx tsc --noEmit
+   bun test        # スキル §5 の注入パターンでハンドラを検証
+   ```
 
 6. 実行: `SERVER_URL=https://<ホスト済み Giracle> BOT_TOKEN=<tokenCode> bun run bot.ts`
 
@@ -159,6 +199,7 @@ bun test        # スキル §5 の注入パターンでハンドラを検証
 bun test        # モックのみで検証（実サーバー不要）
 bunx tsc --noEmit
 bun run build
+bun run pack    # build + tarball 作成
 ```
 
 ## 注意事項
