@@ -90,7 +90,7 @@ function report(err: unknown) {
 }
 ```
 
-実行: `SERVER_URL=... BOT_TOKEN=... bun run <file>`
+実行: Bot プロジェクト直下の `.env` に `SERVER_URL` / `BOT_TOKEN` を置き、`bun run <file>`（Bun が `.env` を自動で読む）。`.env` は Git に入れない。
 
 ## 3. 落とし穴（ここを外すと本番で壊れる）
 
