@@ -146,11 +146,18 @@ Bot プロジェクトはこのリポジトリの**外**（兄弟ディレクト
    }
    ```
 
-3. `bot.ts` を置いて起動する。雛形は `skills/create-giracle-bot/SKILL.md` §2。接続先とトークンは環境変数で渡す（`SERVER_URL` の既定は `http://localhost:3000`）。パッケージの中身がリポジトリから `dist/` に変わっても、import は `giracle-bot` のままで呼び出し側は変わらない。
+3. `bot.ts` を置き、プロジェクト直下の `.env` に接続先とトークンを書いて起動する。Bun は起動時に `.env` を自動で読むので、コマンドに環境変数を並べる必要はない。雛形は `skills/create-giracle-bot/SKILL.md` §2。パッケージの中身がリポジトリから `dist/` に変わっても、import は `giracle-bot` のままで呼び出し側は変わらない。
 
    ```sh
-   SERVER_URL=http://localhost:3000 BOT_TOKEN=<tokenCode> bun run bot.ts
+   cat > .env <<'EOF'
+   SERVER_URL=http://localhost:3000
+   BOT_TOKEN=<tokenCode>
+   EOF
+
+   bun run bot.ts
    ```
+
+   `.env` は Git に入れない（Bot プロジェクト側の `.gitignore` に入れる）。`SERVER_URL` を省略した場合の既定値は `http://localhost:3000`。
 
 補足:
 
@@ -193,7 +200,7 @@ Bot プロジェクトはこのリポジトリの**外**（兄弟ディレクト
    bun test        # スキル §5 の注入パターンでハンドラを検証
    ```
 
-6. 実行: `SERVER_URL=https://<ホスト済み Giracle> BOT_TOKEN=<tokenCode> bun run bot.ts`
+6. `.env` に `SERVER_URL` / `BOT_TOKEN` を書いて `bun run bot.ts`（Bun が `.env` を自動で読む）
 
 `tokenCode` は管理者から受け取る（`PUT /bot`）。接続先は自分で立てたサーバーでも既存インスタンスでも同じ。
 
