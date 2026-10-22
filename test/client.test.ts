@@ -45,7 +45,10 @@ describe("GiracleClient", () => {
         "content-type": "application/json",
       });
 
-      return okJson({ message: "Sent message", data: { messageSaved: msg, messageReplyingTo: null } });
+      return okJson({
+        message: "Sent message",
+        data: { messageSaved: msg, messageReplyingTo: null },
+      });
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
@@ -68,11 +71,18 @@ describe("GiracleClient", () => {
 
   test("sendMessage のリクエストボディ形状。replyingMessageId 省略時はボディに載らない", async () => {
     const { impl, calls } = mockFetch(() =>
-      okJson({ message: "Sent message", data: { messageSaved: makeMessage(), messageReplyingTo: null } }),
+      okJson({
+        message: "Sent message",
+        data: { messageSaved: makeMessage(), messageReplyingTo: null },
+      }),
     );
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    await client.sendMessage({ channelId: "c1", message: "hi", replyingMessageId: "m9" });
+    await client.sendMessage({
+      channelId: "c1",
+      message: "hi",
+      replyingMessageId: "m9",
+    });
     await client.sendMessage({ channelId: "c1", message: "hi" });
 
     expect(calls).toHaveLength(2);
@@ -99,10 +109,12 @@ describe("GiracleClient", () => {
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const err = await client
+      .sendMessage({ channelId: "c1", message: "hi" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
 
     expect(err).toBeInstanceOf(GiracleApiError);
     const apiErr = err as GiracleApiError;
@@ -112,41 +124,51 @@ describe("GiracleClient", () => {
   });
 
   test("非 2xx には Bot 無効化 (400) も GiracleApiError にそのまま載る", async () => {
-    const { impl } = mockFetch(() => textRes(400, "Bot is not enabled on this server"));
+    const { impl } = mockFetch(() =>
+      textRes(400, "Bot is not enabled on this server"),
+    );
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const err = await client
+      .sendMessage({ channelId: "c1", message: "hi" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
 
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).status).toBe(400);
-    expect((err as GiracleApiError).body).toBe("Bot is not enabled on this server");
+    expect((err as GiracleApiError).body).toBe(
+      "Bot is not enabled on this server",
+    );
   });
 
   test("200 だが本文が JSON でない → GiracleApiError(status=200, body 保持)", async () => {
     const { impl } = mockFetch(() => textRes(200, "<html>oops</html>"));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const err = await client
+      .sendMessage({ channelId: "c1", message: "hi" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
 
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).status).toBe(200);
     expect((err as GiracleApiError).body).toBe("<html>oops</html>");
   });
 
-  test("204 空ボディ → GiracleApiError(status=204, body=\"\")", async () => {
+  test('204 空ボディ → GiracleApiError(status=204, body="")', async () => {
     const { impl } = mockFetch(() => textRes(204, ""));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const err = await client
+      .sendMessage({ channelId: "c1", message: "hi" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
 
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).status).toBe(204);
@@ -155,7 +177,10 @@ describe("GiracleClient", () => {
 
   test("serverUrl の末尾スラッシュは正規化され二重スラッシュにならない", async () => {
     const { impl, calls } = mockFetch(() =>
-      okJson({ message: "Sent message", data: { messageSaved: makeMessage(), messageReplyingTo: null } }),
+      okJson({
+        message: "Sent message",
+        data: { messageSaved: makeMessage(), messageReplyingTo: null },
+      }),
     );
     const client = new GiracleClient(`${SERVER}/`, TOKEN, impl);
 
@@ -168,10 +193,12 @@ describe("GiracleClient", () => {
     const { impl } = mockFetch(() => okJson({ message: "no data" }));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.sendMessage({ channelId: "c1", message: "hi" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const err = await client
+      .sendMessage({ channelId: "c1", message: "hi" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
 
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).body).toBe("unexpected response shape");
@@ -187,7 +214,10 @@ describe("GiracleClient", () => {
     });
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const got = await client.editMessage({ messageId: "m-abc", message: "after" });
+    const got = await client.editMessage({
+      messageId: "m-abc",
+      message: "after",
+    });
 
     expect(got).toEqual(row);
     expect(got.content).toBe("after");
@@ -198,27 +228,35 @@ describe("GiracleClient", () => {
   });
 
   test("editMessage 403 → GiracleApiError(status=403, body 保持)", async () => {
-    const { impl } = mockFetch(() => textRes(403, "You are not sender of this message"));
+    const { impl } = mockFetch(() =>
+      textRes(403, "You are not sender of this message"),
+    );
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.editMessage({ messageId: "m1", message: "x" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const err = await client
+      .editMessage({ messageId: "m1", message: "x" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
 
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).status).toBe(403);
-    expect((err as GiracleApiError).body).toBe("You are not sender of this message");
+    expect((err as GiracleApiError).body).toBe(
+      "You are not sender of this message",
+    );
   });
 
   test("editMessage 200 だが id 無し JSON → GiracleApiError", async () => {
     const { impl } = mockFetch(() => okJson({ message: "ok" }));
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
-    const err = await client.editMessage({ messageId: "m1", message: "x" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const err = await client
+      .editMessage({ messageId: "m1", message: "x" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
 
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).body).toBe("unexpected response shape");
@@ -247,7 +285,9 @@ describe("GiracleClient", () => {
   });
 
   test("deleteMessage 403 → GiracleApiError(status=403, body 保持)", async () => {
-    const { impl } = mockFetch(() => textRes(403, "You are not owner of this message"));
+    const { impl } = mockFetch(() =>
+      textRes(403, "You are not owner of this message"),
+    );
     const client = new GiracleClient(SERVER, TOKEN, impl);
 
     const err = await client.deleteMessage({ messageId: "m1" }).then(
@@ -257,7 +297,9 @@ describe("GiracleClient", () => {
 
     expect(err).toBeInstanceOf(GiracleApiError);
     expect((err as GiracleApiError).status).toBe(403);
-    expect((err as GiracleApiError).body).toBe("You are not owner of this message");
+    expect((err as GiracleApiError).body).toBe(
+      "You are not owner of this message",
+    );
   });
 
   test("deleteMessage 200 だが id 無し JSON → GiracleApiError", async () => {
@@ -337,7 +379,11 @@ describe("GiracleClient", () => {
 
   test("getUser 200 だが ChannelJoin 要素の channelId が文字列でない → GiracleApiError", async () => {
     const { impl } = mockFetch(() =>
-      okJson(makeUser({ ChannelJoin: [{ channelId: 1 }] as unknown as User["ChannelJoin"] })),
+      okJson(
+        makeUser({
+          ChannelJoin: [{ channelId: 1 }] as unknown as User["ChannelJoin"],
+        }),
+      ),
     );
     const client = new GiracleClient(SERVER, TOKEN, impl);
 

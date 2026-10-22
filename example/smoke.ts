@@ -19,7 +19,9 @@ const channelId = process.argv[4] ?? "";
 const cookie = process.argv[5] ?? "";
 
 if (!botToken || !channelId || !cookie) {
-  console.error("usage: bun run smoke.ts <botToken> <botUserId> <channelId> <cookie>");
+  console.error(
+    "usage: bun run smoke.ts <botToken> <botUserId> <channelId> <cookie>",
+  );
   process.exit(1);
 }
 
@@ -40,13 +42,19 @@ bot.start();
 
 const messages: Message[] = [];
 const received: { update: unknown | null } = { update: null };
-bot.on("message", (m) => { messages.push(m); });
-bot.on("messageUpdate", (u) => { received.update = u; });
+bot.on("message", (m) => {
+  messages.push(m);
+});
+bot.on("messageUpdate", (u) => {
+  received.update = u;
+});
 
 bot.on("error", (e) => fail(`error event: ${e.message}`));
 
 let inboxType = "";
-bot.on("inbox", (i) => { inboxType = i.type; });
+bot.on("inbox", (i) => {
+  inboxType = i.type;
+});
 
 // open は接続直後に発火するため、他の待ち受けより先に登録しておく。
 // 2 回目以降の open は「切断 → 再接続」を意味する（step 4 の liveness 検証に使う）
@@ -80,9 +88,11 @@ const userRes = await fetch(`${SERVER}/message/send`, {
   headers: { "content-type": "application/json", cookie: `token=${cookie}` },
   body: JSON.stringify({ channelId, message: `@<${botUserId}> user smoke` }),
 });
-if (!userRes.ok) fail(`user send 失敗 ${userRes.status}: ${await userRes.text()}`);
+if (!userRes.ok)
+  fail(`user send 失敗 ${userRes.status}: ${await userRes.text()}`);
 
-for (let i = 0; i < 50 && !messages.some((m) => m.userId !== botUserId); i++) await sleep(100);
+for (let i = 0; i < 50 && !messages.some((m) => m.userId !== botUserId); i++)
+  await sleep(100);
 const userMsg = messages.find((m) => m.userId !== botUserId);
 if (!userMsg) fail("message イベント無し");
 console.log("message event OK:", userMsg.content, userMsg.createdAt);
@@ -99,7 +109,8 @@ if (openCount !== 1) fail(`pong 無応答で再接続した (open ${openCount} �
 
 // 遅れて届いた自己送信も見逃さない（step 1 の早期チェックは 500ms 窓しか見ていない）
 const selfEcho = messages.find((m) => m.userId === botUserId);
-if (selfEcho) fail(`bot 自身の送信が WS 配信された: ${JSON.stringify(selfEcho)}`);
+if (selfEcho)
+  fail(`bot 自身の送信が WS 配信された: ${JSON.stringify(selfEcho)}`);
 console.log("ping/pong ラウンドトリップ後も接続維持 OK");
 
 bot.stop();

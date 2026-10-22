@@ -9,11 +9,11 @@ Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /e
 
 ## 0. 作業前に必ず読む
 
-| 読むもの | 得られるもの |
-| --- | --- |
-| `src/types.ts`（利用側ではインストール済み `giracle-bot` の型定義 + 本スキル §1 を正とする） | イベント名・ペイロード型の唯一の正。推測でイベント名を書かない |
-| `example/echo.ts` `example/reply-bot.ts` `example/edit-watcher.ts` `example/edit-bot.ts` `example/delete-bot.ts` `example/ping.ts`（フレームワーク内。利用側では §2 を雛形にする） | 動く雛形。新規 Bot はこのどれかを土台にする |
-| `test/bot.test.ts` `test/mockWebSocket.ts`（フレームワーク内。利用側では §5 の注入パターンを使う） | 実サーバー無しで検証するための注入方法 |
+| 読むもの                                                                                                                                                                           | 得られるもの                                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `src/types.ts`（利用側ではインストール済み `giracle-bot` の型定義 + 本スキル §1 を正とする）                                                                                       | イベント名・ペイロード型の唯一の正。推測でイベント名を書かない |
+| `example/echo.ts` `example/reply-bot.ts` `example/edit-watcher.ts` `example/edit-bot.ts` `example/delete-bot.ts` `example/ping.ts`（フレームワーク内。利用側では §2 を雛形にする） | 動く雛形。新規 Bot はこのどれかを土台にする                    |
+| `test/bot.test.ts` `test/mockWebSocket.ts`（フレームワーク内。利用側では §5 の注入パターンを使う）                                                                                 | 実サーバー無しで検証するための注入方法                         |
 
 フレームワーク自体（`src/`）は変更しない。Bot の実装は利用側プロジェクトのエントリ 1 ファイルに閉じる（フレームワーク開発時のみ `example/`）。
 
@@ -22,31 +22,35 @@ Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /e
 ```ts
 const bot = new GiracleBot({
   serverUrl: "http://localhost:3000", // 末尾スラッシュ可、http→ws は内部変換。http(s)/ws(s) 以外は構築時 TypeError
-  token: process.env.BOT_TOKEN!,      // BotManage.tokenCode。Bearer 不要、生値を Authorization に載せる
+  token: process.env.BOT_TOKEN!, // BotManage.tokenCode。Bearer 不要、生値を Authorization に載せる
   // テスト用: fetchImpl / WebSocketImpl / pingIntervalMs / reconnectBaseMs
 });
 
-bot.start();                       // WS 接続開始（戻り値なし、非同期の完了通知もない）
-bot.stop();                        // 明示停止 + close イベント
+bot.start(); // WS 接続開始（戻り値なし、非同期の完了通知もない）
+bot.stop(); // 明示停止 + close イベント
 
-await bot.sendMessage({ channelId, message: content, replyingMessageId: replyId }); // Message（送信結果）
-await bot.editMessage({ messageId, message: content });                             // MessageUpdate（自分の送信行のみ）
-await bot.deleteMessage({ messageId });                                             // DeletedMessage（自分の送信行のみ）
-await bot.getUser({ userId });                                                      // User（ChannelJoin は閲覧可能チャンネルのみ）
+await bot.sendMessage({
+  channelId,
+  message: content,
+  replyingMessageId: replyId,
+}); // Message（送信結果）
+await bot.editMessage({ messageId, message: content }); // MessageUpdate（自分の送信行のみ）
+await bot.deleteMessage({ messageId }); // DeletedMessage（自分の送信行のみ）
+await bot.getUser({ userId }); // User（ChannelJoin は閲覧可能チャンネルのみ）
 ```
 
 Bot 用 HTTP API は **send / edit / delete / getUser の 4 つのみ**。メッセージ取得は `/ext` に存在しない。
 
 イベント（`bot.on(name, handler)`）:
 
-| イベント | ペイロード | 注意 |
-| --- | --- | --- |
-| `message` | `Message` | 新規投稿（signal 名は `message::UpdateMessage`）。**Bot 自身の送信は配信されない**ため自己送信ガード不要。システムメッセージも含む |
-| `messageUpdate` | `MessageUpdate` | 編集のみ。`{ id, channelId, userId, content, isEdited: true }` の部分行 |
-| `inbox` | `{ message, type }` | Bot ユーザーがメンション（type `mention`）・返信（type `reply`）されたとき |
-| `open` | なし | WS 接続確立（初回・**再接続の毎回**）。`on` に副作用を置くと再接続で再実行されるため、一回限りの処理は `bot.once("open", …)` |
-| `error` | `Error` | WS `ERROR` signal の受信時のみ（fatal。`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` / `getUser` の reject なので catch する |
-| `close` | なし | `stop()` または `ERROR` signal 後 |
+| イベント        | ペイロード          | 注意                                                                                                                                                               |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `message`       | `Message`           | 新規投稿（signal 名は `message::UpdateMessage`）。**Bot 自身の送信は配信されない**ため自己送信ガード不要。システムメッセージも含む                                 |
+| `messageUpdate` | `MessageUpdate`     | 編集のみ。`{ id, channelId, userId, content, isEdited: true }` の部分行                                                                                            |
+| `inbox`         | `{ message, type }` | Bot ユーザーがメンション（type `mention`）・返信（type `reply`）されたとき                                                                                         |
+| `open`          | なし                | WS 接続確立（初回・**再接続の毎回**）。`on` に副作用を置くと再接続で再実行されるため、一回限りの処理は `bot.once("open", …)`                                       |
+| `error`         | `Error`             | WS `ERROR` signal の受信時のみ（fatal。`close` も続けて発火）。HTTP 失敗は `sendMessage` / `editMessage` / `deleteMessage` / `getUser` の reject なので catch する |
+| `close`         | なし                | `stop()` または `ERROR` signal 後                                                                                                                                  |
 
 無い機能: メッセージ取得（Bot API に無い）、リアクション、タイピング、削除の受信（Bot は `GLOBAL` を購読しないため `message::MessageDeleted` は届かない）、URL プレビューの更新配信。必要になったら「フレームワークのスコープ外」と報告する。
 
@@ -70,7 +74,7 @@ const bot = new GiracleBot({
 });
 
 bot.on("message", (msg) => {
-  if (msg.isSystemMessage) return;                     // 入退室等のシステムメッセージ
+  if (msg.isSystemMessage) return; // 入退室等のシステムメッセージ
 
   if (msg.content.trim() !== "!ping") return;
   bot.sendMessage({ channelId: msg.channelId, message: "pong" }).catch(report);
@@ -80,7 +84,8 @@ bot.on("error", (err) => console.error("bot error:", err));
 bot.start();
 
 function report(err: unknown) {
-  if (err instanceof GiracleApiError) console.error(`API error ${err.status}: ${err.body}`);
+  if (err instanceof GiracleApiError)
+    console.error(`API error ${err.status}: ${err.body}`);
   else console.error(err);
 }
 ```
@@ -132,11 +137,21 @@ const fetchImpl = (async (_input: unknown) =>
     headers: { "content-type": "application/json" },
   })) as typeof fetch;
 
-const bot = new GiracleBot({ serverUrl: "http://x", token: "t", fetchImpl, WebSocketImpl: MockWebSocket });
+const bot = new GiracleBot({
+  serverUrl: "http://x",
+  token: "t",
+  fetchImpl,
+  WebSocketImpl: MockWebSocket,
+});
 bot.start();
 const ws = MockWebSocket.instances.at(-1)!;
 ws.open();
-ws.receive(JSON.stringify({ signal: "message::UpdateMessage", data: makeMessage({ userId: "alice", content: "!ping" }) }));
+ws.receive(
+  JSON.stringify({
+    signal: "message::UpdateMessage",
+    data: makeMessage({ userId: "alice", content: "!ping" }),
+  }),
+);
 // → ハンドラの副作用（ws.sent / 送信回数）を assert する
 ```
 

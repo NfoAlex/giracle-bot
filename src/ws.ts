@@ -95,7 +95,8 @@ export class GiracleSocket {
       this.opts.WebSocketImpl ?? (WebSocket as unknown as SocketCtor);
     let ws: SocketLike;
 
-    const label = this.attempt > 0 ? `再接続を試行 (attempt ${this.attempt})` : "接続開始";
+    const label =
+      this.attempt > 0 ? `再接続を試行 (attempt ${this.attempt})` : "接続開始";
 
     log(`${label}: ${this.url}`);
 
@@ -111,7 +112,11 @@ export class GiracleSocket {
     }
 
     ws.onopen = () => {
-      log(this.attempt > 0 ? `再接続に成功 (attempt ${this.attempt})` : "接続確立");
+      log(
+        this.attempt > 0
+          ? `再接続に成功 (attempt ${this.attempt})`
+          : "接続確立",
+      );
 
       // attempt はここで戻さない。open 直後に切れるサーバーだと毎回 1 秒で
       // 再接続し続け、指数バックオフが働かない（pong 受信で健全と確認してから戻す）。

@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { GiracleBot } from "../src/bot";
 import type { BotOptions } from "../src/types";
-import { makeMessage, makeUpdate, makeUser, MockWebSocket, latestMock } from "./mockWebSocket";
+import {
+  makeMessage,
+  makeUpdate,
+  makeUser,
+  MockWebSocket,
+  latestMock,
+} from "./mockWebSocket";
 
 const SERVER = "http://localhost:3000";
 const TOKEN = "tok-1";
@@ -38,7 +44,13 @@ describe("GiracleBot serverUrl 検証", () => {
   });
 
   test("http(s) / ws(s) は受理する（大文字 scheme 含む）", () => {
-    for (const url of ["http://h", "https://h", "ws://h", "wss://h", "HTTP://h/"]) {
+    for (const url of [
+      "http://h",
+      "https://h",
+      "ws://h",
+      "wss://h",
+      "HTTP://h/",
+    ]) {
       expect(() => newBot({ serverUrl: url })).not.toThrow();
     }
   });
@@ -88,7 +100,10 @@ describe("GiracleBot", () => {
     b.start();
 
     latestMock().receive(
-      JSON.stringify({ signal: "message::UpdateMessage", data: makeUpdate({ id: "m3" }) }),
+      JSON.stringify({
+        signal: "message::UpdateMessage",
+        data: makeUpdate({ id: "m3" }),
+      }),
     );
 
     expect(messages).toHaveLength(0);
@@ -104,7 +119,10 @@ describe("GiracleBot", () => {
     b.start();
 
     latestMock().receive(
-      JSON.stringify({ signal: "message::UpdateMessage", data: { content: "x" } }),
+      JSON.stringify({
+        signal: "message::UpdateMessage",
+        data: { content: "x" },
+      }),
     );
 
     expect(got).toHaveLength(0);
@@ -122,7 +140,13 @@ describe("GiracleBot", () => {
     latestMock().receive(
       JSON.stringify({
         signal: "message::UpdateMessage",
-        data: { id: "m4", channelId: "c1", userId: "u1", content: "x", isEdited: true },
+        data: {
+          id: "m4",
+          channelId: "c1",
+          userId: "u1",
+          content: "x",
+          isEdited: true,
+        },
       }),
     );
 
@@ -142,13 +166,25 @@ describe("GiracleBot", () => {
     latestMock().receive(
       JSON.stringify({
         signal: "message::UpdateMessage",
-        data: { id: "m5", channelId: "c1", userId: "u1", content: "x", isEdited: "true" },
+        data: {
+          id: "m5",
+          channelId: "c1",
+          userId: "u1",
+          content: "x",
+          isEdited: "true",
+        },
       }),
     );
     latestMock().receive(
       JSON.stringify({
         signal: "message::UpdateMessage",
-        data: { id: "m6", channelId: "c1", userId: "u1", content: "x", isEdited: 1 },
+        data: {
+          id: "m6",
+          channelId: "c1",
+          userId: "u1",
+          content: "x",
+          isEdited: 1,
+        },
       }),
     );
 
@@ -171,7 +207,9 @@ describe("GiracleBot", () => {
 
     expect(inboxes).toHaveLength(1);
     expect((inboxes[0] as { type: string }).type).toBe("mention");
-    expect((inboxes[0] as { message: { id: string } }).message.id).toBe("inbox-m");
+    expect((inboxes[0] as { message: { id: string } }).message.id).toBe(
+      "inbox-m",
+    );
   });
 
   test("message 無しの inbox::Added は発火しない", () => {
@@ -181,7 +219,9 @@ describe("GiracleBot", () => {
     b.on("inbox", (i) => inboxes.push(i));
     b.start();
 
-    latestMock().receive(JSON.stringify({ signal: "inbox::Added", data: { type: "mention" } }));
+    latestMock().receive(
+      JSON.stringify({ signal: "inbox::Added", data: { type: "mention" } }),
+    );
 
     expect(inboxes).toHaveLength(0);
   });
@@ -194,7 +234,10 @@ describe("GiracleBot", () => {
     b.start();
 
     latestMock().receive(
-      JSON.stringify({ signal: "inbox::Added", data: { message: makeMessage({ id: "t1" }) } }),
+      JSON.stringify({
+        signal: "inbox::Added",
+        data: { message: makeMessage({ id: "t1" }) },
+      }),
     );
     latestMock().receive(
       JSON.stringify({
@@ -231,7 +274,10 @@ describe("GiracleBot", () => {
     b.start();
 
     latestMock().receive(
-      JSON.stringify({ signal: "message::UpdateMessage", data: { id: "x", isEdited: true } }),
+      JSON.stringify({
+        signal: "message::UpdateMessage",
+        data: { id: "x", isEdited: true },
+      }),
     );
 
     expect(got).toHaveLength(0);
@@ -261,13 +307,20 @@ describe("GiracleBot", () => {
         expect(init?.method).toBe("POST");
 
         return new Response(
-          JSON.stringify({ message: "Sent message", data: { messageSaved: makeMessage(), messageReplyingTo: null } }),
+          JSON.stringify({
+            message: "Sent message",
+            data: { messageSaved: makeMessage(), messageReplyingTo: null },
+          }),
           { status: 200, headers: { "content-type": "application/json" } },
         );
       }) as typeof fetch,
     });
     bot = b;
-    const sent = await b.sendMessage({ channelId: "c1", message: "hi", replyingMessageId: "m9" });
+    const sent = await b.sendMessage({
+      channelId: "c1",
+      message: "hi",
+      replyingMessageId: "m9",
+    });
 
     expect(sent.id).toBe("m1");
   });
@@ -282,10 +335,13 @@ describe("GiracleBot", () => {
           message: "after",
         });
 
-        return new Response(JSON.stringify(makeUpdate({ id: "m1", content: "after" })), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify(makeUpdate({ id: "m1", content: "after" })),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
       }) as typeof fetch,
     });
     bot = b;
@@ -323,7 +379,13 @@ describe("GiracleBot", () => {
         expect(init?.method).toBe("GET");
 
         return new Response(
-          JSON.stringify(makeUser({ id: "TESTUSER", name: "testsystemuser", ChannelJoin: [{ channelId: "TESTCHANNEL1" }] })),
+          JSON.stringify(
+            makeUser({
+              id: "TESTUSER",
+              name: "testsystemuser",
+              ChannelJoin: [{ channelId: "TESTCHANNEL1" }],
+            }),
+          ),
           { status: 200, headers: { "content-type": "application/json" } },
         );
       }) as typeof fetch,
@@ -398,7 +460,9 @@ describe("GiracleBot", () => {
     b.on("close", () => (closed += 1));
     b.start();
 
-    latestMock().receive(JSON.stringify({ signal: "ERROR", data: "This bot is disabled" }));
+    latestMock().receive(
+      JSON.stringify({ signal: "ERROR", data: "This bot is disabled" }),
+    );
     expect(closed).toBe(1);
 
     b.stop();
@@ -413,7 +477,9 @@ describe("GiracleBot", () => {
     b.on("error", () => b.start()); // ハンドラ内で再起動
     b.start();
 
-    latestMock().receive(JSON.stringify({ signal: "ERROR", data: "Invalid token" }));
+    latestMock().receive(
+      JSON.stringify({ signal: "ERROR", data: "Invalid token" }),
+    );
 
     expect(closed).toBe(1); // 1 セッション目の close
     expect(MockWebSocket.instances).toHaveLength(2); // 再起動済み
@@ -507,7 +573,9 @@ describe("GiracleBot", () => {
       latestMock().open();
       expect(opened).toBe(1);
 
-      latestMock().receive(JSON.stringify({ signal: "ERROR", data: "unauthorized" }));
+      latestMock().receive(
+        JSON.stringify({ signal: "ERROR", data: "unauthorized" }),
+      );
 
       b.start(); // ERROR でソケットは破棄済み → 再起動できる
       expect(MockWebSocket.instances).toHaveLength(2);
