@@ -146,7 +146,11 @@ Bot プロジェクトはこのリポジトリの**外**（兄弟ディレクト
    }
    ```
 
-3. `bun run bot.ts` で起動する。パッケージの中身がリポジトリから `dist/` に変わっても、import は `giracle-bot` のままで呼び出し側は変わらない。
+3. `bot.ts` を置いて起動する。雛形は `skills/create-giracle-bot/SKILL.md` §2。接続先とトークンは環境変数で渡す（`SERVER_URL` の既定は `http://localhost:3000`）。パッケージの中身がリポジトリから `dist/` に変わっても、import は `giracle-bot` のままで呼び出し側は変わらない。
+
+   ```sh
+   SERVER_URL=http://localhost:3000 BOT_TOKEN=<tokenCode> bun run bot.ts
+   ```
 
 補足:
 
