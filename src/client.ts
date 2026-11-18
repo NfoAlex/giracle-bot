@@ -53,11 +53,7 @@ export class GiracleClient {
       ? res
       : (res as SendResponse | undefined)?.data?.messageSaved;
 
-    if (!isRow(row)) {
-      throw new GiracleApiError(200, "unexpected response shape");
-    }
-
-    return row as Message;
+    return expectRow(row) as Message;
   }
 
   /**
@@ -71,11 +67,7 @@ export class GiracleClient {
       message: params.message,
     });
 
-    if (!isRow(res)) {
-      throw new GiracleApiError(200, "unexpected response shape");
-    }
-
-    return res as MessageUpdate;
+    return expectRow(res) as MessageUpdate;
   }
 
   /**
@@ -89,11 +81,7 @@ export class GiracleClient {
       messageId: params.messageId,
     });
 
-    if (!isRow(res)) {
-      throw new GiracleApiError(200, "unexpected response shape");
-    }
-
-    return res as DeletedMessage;
+    return expectRow(res) as DeletedMessage;
   }
 
   /**
@@ -163,6 +151,15 @@ function isRow(data: unknown): data is Record<string, unknown> {
     data !== null &&
     typeof (data as Record<string, unknown>).id === "string"
   );
+}
+
+/** isRow を通らなければ 200 + 本文の形状エラーとして扱う */
+function expectRow(data: unknown): Record<string, unknown> {
+  if (!isRow(data)) {
+    throw new GiracleApiError(200, "unexpected response shape");
+  }
+
+  return data;
 }
 
 /**
