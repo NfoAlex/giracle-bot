@@ -10,7 +10,7 @@ import {
 } from "./mockWebSocket";
 
 const SERVER = "http://localhost:3000";
-const TOKEN = "tok-1";
+const TOKEN = "0123456789abcdef".repeat(4); // BotManage.tokenCode（32バイト hex）
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -53,6 +53,26 @@ describe("GiracleBot serverUrl 検証", () => {
     ]) {
       expect(() => newBot({ serverUrl: url })).not.toThrow();
     }
+  });
+});
+
+describe("GiracleBot token 検証", () => {
+  test("64 hex 以外は構築時に TypeError", () => {
+    for (const token of [
+      "",
+      "tok-1",
+      "0".repeat(63),
+      "0".repeat(65),
+      `${new Array(64).fill("0").join("")}\n`,
+      "g".repeat(64),
+    ]) {
+      expect(() => newBot({ token })).toThrow(TypeError);
+    }
+  });
+
+  test("64 hex（大文字含む）は受理する", () => {
+    expect(() => newBot()).not.toThrow();
+    expect(() => newBot({ token: "ABCDEF01".repeat(8) })).not.toThrow();
   });
 });
 

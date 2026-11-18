@@ -139,7 +139,7 @@ const fetchImpl = (async (_input: unknown) =>
 
 const bot = new GiracleBot({
   serverUrl: "http://x",
-  token: "t",
+  token: "0123456789abcdef".repeat(4), // BotManage.tokenCode（32バイト hex）
   fetchImpl,
   WebSocketImpl: MockWebSocket,
 });

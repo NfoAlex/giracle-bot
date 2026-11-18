@@ -17,6 +17,9 @@ import type {
   User,
 } from "./types";
 
+/** BotManage.tokenCode（32バイト hex）の形式。Authorization にそのまま載せるため改行等を通さない */
+const TOKEN_CODE_RE = /^[0-9a-f]{64}$/i;
+
 /** 文字列フィールドの型ガード（例: hasStr(data, "id")）。フレームワークが使う列だけ検証する */
 function hasStr(data: unknown, key: string): data is Record<string, unknown> {
   return (
@@ -52,6 +55,11 @@ export class GiracleBot extends EventEmitter {
 
   constructor(options: BotOptions) {
     super();
+
+    if (!TOKEN_CODE_RE.test(options.token)) {
+      throw new TypeError("token が不正: BotManage.tokenCode（64 hex 文字）を渡す");
+    }
+
     this.options = options;
     this.client = new GiracleClient(
       options.serverUrl,
