@@ -2,7 +2,7 @@ import { log } from "./log";
 import type { SignalEnvelope } from "./types";
 
 /** WebSocket.OPEN 相当（型注入を容易にするための定数） */
-export const WS_OPEN = 1;
+const WS_OPEN = 1;
 
 /** WebSocket.CLOSED 相当 */
 const WS_CLOSED = 3;

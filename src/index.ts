@@ -13,6 +13,5 @@ export type {
   MessageUpdate,
   MessageUrlPreview,
   SendMessageParams,
-  SignalEnvelope,
   User,
 } from "./types";
