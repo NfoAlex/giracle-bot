@@ -14,6 +14,9 @@ import { baseUrl } from "./url";
 /** POST で JSON を送るための共通ヘッダ */
 const JSON_HEADERS = { "content-type": "application/json" };
 
+/** fetch の上限 ms。超過は fetch の reject（TimeoutError）としてそのまま伝わる */
+const FETCH_TIMEOUT_MS = 30_000;
+
 /**
  * 現行 giracle-backend の /ext/message/send は保存行そのものを返す。
  * 旧ビルドは { message, data: { messageSaved } } で包むため、そちらも受ける。
@@ -124,6 +127,7 @@ export class GiracleClient {
           ? this.authHeaders()
           : { ...this.authHeaders(), ...JSON_HEADERS },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     return this.handle(res);

@@ -411,6 +411,26 @@ describe("GiracleClient", () => {
     expect((err as GiracleApiError).body).toBe("unexpected response shape");
   });
 
+  test("fetch には timeout 付き AbortSignal が渡り、reject（タイムアウト等）はそのまま伝わる", async () => {
+    const timeoutErr = new DOMException(
+      "The operation timed out.",
+      "TimeoutError",
+    );
+    const { impl, calls } = mockFetch(() => {
+      throw timeoutErr;
+    });
+    const client = new GiracleClient(SERVER, TOKEN, impl);
+
+    const err = await client.getUser({ userId: "u1" }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(calls[0]?.init?.signal).toBeInstanceOf(AbortSignal);
+    expect(calls[0]?.init?.signal?.aborted).toBe(false);
+    expect(err).toBe(timeoutErr); // status を持たないため GiracleApiError には包まない
+  });
+
   test("serverUrl が不正なら構築時に throw する", () => {
     expect(() => new GiracleClient("localhost:3000", TOKEN)).toThrow();
     expect(() => new GiracleClient("httpx://h", TOKEN)).toThrow();
