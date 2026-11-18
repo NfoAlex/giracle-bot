@@ -174,9 +174,10 @@ describe("GiracleSocket ERROR / 再接続", () => {
     const gaps = created.slice(1).map((t, i) => t - created[i]!);
 
     // 期待 20 → 40 → 80ms。open で attempt が 0 に戻ると全部 20ms のまま増えない
-    expect(gaps[0]).toBeGreaterThanOrEqual(15);
-    expect(gaps[1]).toBeGreaterThanOrEqual(30);
-    expect(gaps[2]).toBeGreaterThanOrEqual(60);
+    // 遅延はジッタで 0.5〜1.0 倍になるため、下限は半分で見る
+    expect(gaps[0]).toBeGreaterThanOrEqual(8);
+    expect(gaps[1]).toBeGreaterThanOrEqual(16);
+    expect(gaps[2]).toBeGreaterThanOrEqual(32);
   });
 
   test("pong を受けた健全な接続の次はバックオフが base に戻る", async () => {
@@ -415,6 +416,40 @@ describe("GiracleSocket start 二重呼び出し", () => {
       expect(MockWebSocket.instances).toHaveLength(2); // 余計な再接続をしない
     } finally {
       s.stop();
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe("GiracleSocket 再接続ジッタ", () => {
+  test("遅延は base の 0.5〜1.0 倍に散らされる", () => {
+    const orig = Math.random;
+    jest.useFakeTimers();
+
+    try {
+      // ジッタ無しならどちらも 1000ms 後に接続される
+      const cases: Array<[rand: number, delay: number]> = [
+        [0, 500],
+        [0.5, 750],
+      ];
+
+      for (const [rand, delay] of cases) {
+        MockWebSocket.instances = [];
+        Math.random = () => rand;
+        const s = makeSocket({ reconnectBaseMs: 1_000 });
+        s.start();
+        latestMock().serverClose();
+
+        jest.advanceTimersByTime(delay - 1);
+        expect(MockWebSocket.instances).toHaveLength(1);
+
+        jest.advanceTimersByTime(1);
+        expect(MockWebSocket.instances).toHaveLength(2);
+
+        s.stop();
+      }
+    } finally {
+      Math.random = orig;
       jest.useRealTimers();
     }
   });

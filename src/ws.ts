@@ -47,6 +47,9 @@ const DEFAULT_BASE = 1_000;
 const DEFAULT_MAX = 60_000;
 const DEFAULT_PING = 30_000;
 const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
+/** ジッタ係数の幅（delay を 0.5〜1.0 倍に散らす） */
+const JITTER_MIN = 0.5;
+const JITTER_SPAN = 0.5;
 
 /**
  * /ext/ws のクライアント。受信 signal の正規化・自動再接続・定期 ping を担う。
@@ -232,7 +235,10 @@ export class GiracleSocket {
       this.opts.reconnectBaseMs && this.opts.reconnectBaseMs > 0
         ? this.opts.reconnectBaseMs
         : DEFAULT_BASE;
-    const delay = nextBackoffMs(this.attempt, base, DEFAULT_MAX);
+    const delay = Math.round(
+      nextBackoffMs(this.attempt, base, DEFAULT_MAX) *
+        (JITTER_MIN + Math.random() * JITTER_SPAN),
+    );
 
     log(`再接続を予約: ${delay}ms 後 (attempt ${this.attempt + 1})`);
 
