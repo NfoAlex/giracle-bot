@@ -22,7 +22,7 @@ Bun 専用・依存ゼロのクライアントライブラリ。Bot は `POST /e
 ```ts
 const bot = new GiracleBot({
   serverUrl: "http://localhost:3000", // 末尾スラッシュ可、http→ws は内部変換。http(s)/ws(s) 以外は構築時 TypeError
-  token: process.env.BOT_TOKEN!, // BotManage.tokenCode。Bearer 不要、生値を Authorization に載せる
+  token: process.env.BOT_TOKEN!, // BotManage.tokenCode。Bearer 不要、生値を Authorization に載せる。64 hex 以外は構築時 TypeError
   // テスト用: fetchImpl / WebSocketImpl / pingIntervalMs / reconnectBaseMs
 });
 
@@ -96,7 +96,7 @@ function report(err: unknown) {
 
 1. **send にはチャンネル参加が必須。** 対象チャンネルに Bot ユーザーが参加していないと 400（`You are not joined this channel`）。参加は作成者が通常ユーザー API で行う。一方 `message` の受信は「閲覧可能」なチャンネル（ロールの可視設定）に及ぶので、受信できても送信できるとは限らない。
 2. **`message` の signal 名は `message::UpdateMessage`。** サーバーは新規メッセージも bot 購読トピックには Update として流す。フレームワークが createdAt の有無で振り分けるため、利用側はイベント名だけ見ればよい。
-3. **エラー分岐は `err.status` のみ。** `err.body` の文言はサーバー実装依存。400 = Bot 無効（`Bot is not enabled`）・空・長すぎ・未参加・返信先なし、401 = token 不正 / 未承認 / 無効化。文言で `if (body.includes(...))` を書かない。
+3. **エラー分岐は `err.status` のみ。** `err.body` の文言はサーバー実装依存。なお HTTP は 30 秒（固定）で打ち切られ `TimeoutError` で reject する（`GiracleApiError` ではないので `status` は無い。`instanceof` で振り分ける）。400 = Bot 無効（`Bot is not enabled`）・空・長すぎ・未参加・返信先なし、401 = token 不正 / 未承認 / 無効化。文言で `if (body.includes(...))` を書かない。
 4. **`ERROR` signal は fatal。** 再接続しない（`close` → `error`）。原因はトークン無効・未承認・無効化など。401 が続く場合は token か承認状態を疑い、コードではなく運用（管理者への確認）を促す。
 5. **HTTP 例外は投げっぱなし。** `sendMessage` は reject する。`await ... .catch(report)` か `try/catch` を必ず付ける。
 6. **送信前バリデーション。** 空白のみ / 長すぎはサーバーが 400 を返す。ユーザー入力をそのまま送らず `trim()` し、`startsWith("!cmd")` 系は空ボディを弾く。
@@ -105,7 +105,7 @@ function report(err: unknown) {
 9. **SQLite 書き込み競合。** 連投・全チャンネル一斉送信は避ける。必要なら Bot 側で送信間隔を空ける。
 10. **システムメッセージを応答対象にしない。** `isSystemMessage: true`（`content` は JSON 文字列）が `message` に流れる。`if (msg.isSystemMessage) return;` をガードに足す。
 11. **Bot として送信/編集/削除したメッセージの WS 通知は来ない（自分にも他 Bot にも）。** send / edit は `channel::<channelId>` にのみ publish するため Bot が購読する `bot::channel::` には届かず、delete の `message::MessageDeleted` は `GLOBAL` にのみ publish される（Bot は `GLOBAL` を購読しない）。Bot 同士・自分自身の echo ループも起きない。その代わり自分の操作を `message` / `messageUpdate` イベントからは追えない（`sendMessage` / `editMessage` / `deleteMessage` の戻り値を使う）。
-12. **不正 payload は無言で破棄される。** `message::UpdateMessage` は全行分（`createdAt` あり）と部分行（`id` + `isEdited` が boolean）だけをイベント化し、他は log も出さず捨てる。イベントが突然来なくなったら接続ログを見たうえでバックエンドの payload 形状（`createdAt` / `isEdited`）を疑う。
+12. **不正 payload は無言で破棄される。** `message::UpdateMessage` は全行分（`id` / `channelId` / `userId` / `content` / `createdAt` が文字列）と部分行（同じ 4 列 + `isEdited` が boolean）だけをイベント化し、他は log も出さず捨てる。イベントが突然来なくなったら接続ログを見たうえでバックエンドの payload 形状（`createdAt` / `isEdited`）を疑う。
 
 ## 4. 実装パターン
 
