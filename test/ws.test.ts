@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import { GiracleSocket, nextBackoffMs } from "../src/ws";
 import type { SignalEnvelope } from "../src/types";
 import { MockWebSocket, latestMock } from "./mockWebSocket";
@@ -296,6 +296,127 @@ describe("GiracleSocket ping", () => {
     expect(ws.closed).toBe(false);
     expect(MockWebSocket.instances).toHaveLength(1);
     expect(got).toEqual([]);
+  });
+});
+
+describe("GiracleSocket connect timeout", () => {
+  test("open しないまま既定時間が経つと close して再接続する", () => {
+    const s = makeSocket({ reconnectBaseMs: 10 });
+    jest.useFakeTimers();
+
+    try {
+      s.start();
+      const ws = latestMock();
+
+      jest.advanceTimersByTime(9_999);
+      expect(ws.closed).toBe(false);
+
+      jest.advanceTimersByTime(1);
+      expect(ws.closed).toBe(true); // CONNECTING のまま放置しない
+
+      jest.advanceTimersByTime(10); // 再接続遅延
+      expect(MockWebSocket.instances).toHaveLength(2);
+    } finally {
+      s.stop();
+      jest.useRealTimers();
+    }
+  });
+
+  test("open したらタイマーは解除され、後から close されない", () => {
+    const s = makeSocket();
+    jest.useFakeTimers();
+
+    try {
+      s.start();
+      const ws = latestMock();
+      ws.open();
+
+      jest.advanceTimersByTime(60_000);
+
+      expect(ws.closed).toBe(false);
+      expect(MockWebSocket.instances).toHaveLength(1);
+    } finally {
+      s.stop();
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe("GiracleSocket start 二重呼び出し", () => {
+  test("start() を 2 回呼んでもソケットは 1 個だけ", () => {
+    const s = makeSocket();
+
+    s.start();
+    s.start();
+
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  test("stop() 後の start() は新規接続する（ガードが残らない）", () => {
+    const s = makeSocket();
+
+    s.start();
+    s.stop();
+    s.start();
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  test("再接続待ちの間に start() してもソケットは 1 個だけ（旧タイマーを落とす）", () => {
+    const s = makeSocket({ reconnectBaseMs: 100 });
+    jest.useFakeTimers();
+
+    try {
+      s.start();
+      const ws = latestMock();
+      ws.serverClose(); // 再接続を予約（readyState は CLOSED）
+
+      s.start(); // 即時接続
+      expect(MockWebSocket.instances).toHaveLength(2);
+
+      jest.advanceTimersByTime(1_000); // 旧タイマーが残っていれば 3 個目ができる
+      expect(MockWebSocket.instances).toHaveLength(2);
+    } finally {
+      s.stop();
+      jest.useRealTimers();
+    }
+  });
+
+  test("実 WS の非同期 close 相当でも stop() 直後の start() は接続する", () => {
+    // close() が readyState を即時 CLOSED にしない（CLOSING に留まる）ソケット
+    class AsyncCloseSocket extends MockWebSocket {
+      override close(): void {
+        this.closed = true;
+      }
+
+      emitClose(): void {
+        this.readyState = 3;
+        this.onclose?.({ code: 1000, reason: "client close" });
+      }
+    }
+
+    const s = new GiracleSocket(URL, TOKEN, {
+      WebSocketImpl: AsyncCloseSocket,
+      reconnectBaseMs: 10,
+    });
+    sockets.push(s);
+    jest.useFakeTimers();
+
+    try {
+      s.start();
+      const ws0 = latestMock() as AsyncCloseSocket;
+
+      s.stop();
+      s.start();
+      expect(MockWebSocket.instances).toHaveLength(2); // CLOSING でも再起動できる
+
+      ws0.emitClose(); // 旧ソケットの close が遅れて届く
+      jest.advanceTimersByTime(100);
+      expect(MockWebSocket.instances).toHaveLength(2); // 余計な再接続をしない
+    } finally {
+      s.stop();
+      jest.useRealTimers();
+    }
   });
 });
 

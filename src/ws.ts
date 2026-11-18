@@ -4,6 +4,9 @@ import type { SignalEnvelope } from "./types";
 /** WebSocket.OPEN 相当（型注入を容易にするための定数） */
 export const WS_OPEN = 1;
 
+/** WebSocket.CLOSED 相当 */
+const WS_CLOSED = 3;
+
 /** close イベントの付帯情報（切断理由をログに出すためだけに使う） */
 export type CloseInfo = { code?: number; reason?: string };
 
@@ -43,6 +46,7 @@ export function nextBackoffMs(
 const DEFAULT_BASE = 1_000;
 const DEFAULT_MAX = 60_000;
 const DEFAULT_PING = 30_000;
+const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 
 /**
  * /ext/ws のクライアント。受信 signal の正規化・自動再接続・定期 ping を担う。
@@ -59,6 +63,7 @@ export class GiracleSocket {
   private ws: SocketLike | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
   /** stop() または ERROR signal 後は再接続しない */
   private noReconnect = false;
   private attempt = 0;
@@ -73,6 +78,13 @@ export class GiracleSocket {
 
   /** 接続開始（明示的な停止前は切断時も自動再接続する） */
   start(): void {
+    if (this.ws && this.ws.readyState !== WS_CLOSED) {
+      log("start() は既に接続済みのため無視");
+
+      return;
+    }
+
+    this.clearReconnect(); // 待機中の再接続と二重に接続しない
     this.noReconnect = false;
     this.attempt = 0;
     this.connect();
@@ -83,8 +95,11 @@ export class GiracleSocket {
     this.noReconnect = true;
     this.clearPing();
     this.clearReconnect();
+    this.clearConnect();
 
     this.ws?.close();
+    // 実 WS の close は非同期（CLOSING → CLOSED）のため、readyState に頼らず手放す
+    this.ws = null;
   }
 
   /** 接続を試みる。接続失敗も指数バックオフで再試行する（fatal にはしない）。 */
@@ -112,6 +127,7 @@ export class GiracleSocket {
     }
 
     ws.onopen = () => {
+      this.clearConnect();
       log(
         this.attempt > 0
           ? `再接続に成功 (attempt ${this.attempt})`
@@ -126,7 +142,11 @@ export class GiracleSocket {
     };
     ws.onmessage = (ev) => this.handleMessage(ev.data);
     ws.onclose = (ev) => {
+      // stop() 済み・再起動済みの古いソケットの close では再接続しない
+      if (this.ws !== ws) return;
+
       this.clearPing();
+      this.clearConnect();
 
       const code = ev?.code;
       const reason = ev?.reason;
@@ -137,13 +157,24 @@ export class GiracleSocket {
         return;
       }
 
-      log(
-        `切断を検知${code !== undefined ? ` (code ${code}${reason ? ` ${reason}` : ""})` : ""}`,
-      );
+      const codeInfo =
+        code === undefined ? "" : ` (code ${code}${reason ? ` ${reason}` : ""})`;
+
+      log(`切断を検知${codeInfo}`);
 
       this.scheduleReconnect();
     };
     this.ws = ws;
+
+    // CONNECTING のまま open しないソケットを放置すると再接続に至らないため、close 経由で再接続させる
+    this.connectTimer = setTimeout(() => {
+      this.connectTimer = null;
+      log(
+        `接続が ${DEFAULT_CONNECT_TIMEOUT_MS}ms 以内に確立しない → close して再接続`,
+      );
+
+      ws.close();
+    }, DEFAULT_CONNECT_TIMEOUT_MS);
   }
 
   /** 受信ペイロードを { signal, data } に正規化して処理する */
@@ -250,5 +281,11 @@ export class GiracleSocket {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
 
     this.reconnectTimer = null;
+  }
+
+  private clearConnect(): void {
+    if (this.connectTimer) clearTimeout(this.connectTimer);
+
+    this.connectTimer = null;
   }
 }
