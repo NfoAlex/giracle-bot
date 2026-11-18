@@ -69,7 +69,9 @@ export class GiracleBot extends EventEmitter {
     super();
 
     if (!TOKEN_CODE_RE.test(options.token)) {
-      throw new TypeError("token が不正: BotManage.tokenCode（64 hex 文字）を渡す");
+      throw new TypeError(
+        "token が不正: BotManage.tokenCode（64 hex 文字）を渡す",
+      );
     }
 
     this.options = options;

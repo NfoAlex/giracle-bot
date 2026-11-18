@@ -161,7 +161,9 @@ export class GiracleSocket {
       }
 
       const codeInfo =
-        code === undefined ? "" : ` (code ${code}${reason ? ` ${reason}` : ""})`;
+        code === undefined
+          ? ""
+          : ` (code ${code}${reason ? ` ${reason}` : ""})`;
 
       log(`切断を検知${codeInfo}`);
 
