@@ -39,6 +39,7 @@ function isFullRow(data: unknown): data is Record<string, unknown> {
     hasStr(data, "id") &&
     hasStr(data, "channelId") &&
     hasStr(data, "userId") &&
+    hasStr(data, "content") &&
     hasStr(data, "createdAt")
   );
 }

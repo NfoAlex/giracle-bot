@@ -63,7 +63,7 @@ describe("GiracleBot token 検証", () => {
       "tok-1",
       "0".repeat(63),
       "0".repeat(65),
-      `${new Array(64).fill("0").join("")}\n`,
+      `${"0".repeat(64)}\n`,
       "g".repeat(64),
     ]) {
       expect(() => newBot({ token })).toThrow(TypeError);
@@ -267,6 +267,40 @@ describe("GiracleBot", () => {
     );
 
     expect(inboxes).toHaveLength(0);
+  });
+
+  test("content が文字列でない全行は message / inbox として発火しない", () => {
+    const b = newBot();
+    bot = b;
+    const got: unknown[] = [];
+    b.on("message", (m) => got.push(m));
+    b.on("inbox", (i) => got.push(i));
+    b.start();
+
+    const full = {
+      id: "m7",
+      channelId: "c1",
+      userId: "u1",
+      createdAt: "2024-01-01T00:00:00.000Z",
+    };
+
+    latestMock().receive(
+      JSON.stringify({ signal: "message::UpdateMessage", data: full }),
+    );
+    latestMock().receive(
+      JSON.stringify({
+        signal: "message::UpdateMessage",
+        data: { ...full, content: 1 },
+      }),
+    );
+    latestMock().receive(
+      JSON.stringify({
+        signal: "inbox::Added",
+        data: { message: full, type: "mention" },
+      }),
+    );
+
+    expect(got).toHaveLength(0);
   });
 
   test("未知 signal / raw は無視する", () => {
