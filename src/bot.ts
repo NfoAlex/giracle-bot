@@ -44,6 +44,17 @@ function isFullRow(data: unknown): data is Record<string, unknown> {
   );
 }
 
+/** 部分行（message::UpdateMessage の編集側）かどうか。isFullRow の対になる検証 */
+function isPartialRow(data: unknown): data is Record<string, unknown> {
+  return (
+    hasStr(data, "id") &&
+    hasStr(data, "channelId") &&
+    hasStr(data, "userId") &&
+    hasStr(data, "content") &&
+    typeof (data as { isEdited?: unknown }).isEdited === "boolean"
+  );
+}
+
 /**
  * Bot の本体。HTTP クライアント + WS 接続 + イベント発火を束ねる。
  * Bot 自身の HTTP 送信は WS 配信されないため自己送信フィルタは不要。
@@ -190,17 +201,7 @@ export class GiracleBot extends EventEmitter {
 
           return;
         }
-        const isBoolEdited =
-          typeof env.data === "object" &&
-          env.data !== null &&
-          typeof (env.data as { isEdited?: unknown }).isEdited === "boolean";
-        if (
-          hasStr(env.data, "id") &&
-          hasStr(env.data, "channelId") &&
-          hasStr(env.data, "userId") &&
-          hasStr(env.data, "content") &&
-          isBoolEdited
-        ) {
+        if (isPartialRow(env.data)) {
           // SAFETY: 直上で id を検証済み。他フィールドは利用側の責務。
           this.emit("messageUpdate", env.data as unknown as MessageUpdate);
 
@@ -212,9 +213,9 @@ export class GiracleBot extends EventEmitter {
       case "inbox::Added": {
         // メンション通知。message が全行分、type が文字列のときだけ流す。
         // id のみの message は捨てる（channelId undefined のまま返信誤送信するため）。
+        // env.data が null / undefined だと .message アクセスで throw するため != null が必要十分
         if (
-          typeof env.data === "object" &&
-          env.data !== null &&
+          env.data != null &&
           isFullRow((env.data as { message?: unknown }).message) &&
           typeof (env.data as { type?: unknown }).type === "string"
         ) {
